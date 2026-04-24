@@ -70,6 +70,61 @@ export async function createNotionPage(title, content, due_date = null, priority
   }
 }
 
+export async function updateNotionPage(pageId, updates) {
+  try {
+    const properties = {};
+
+    if (updates.title) {
+      properties.Nombre = { title: [{ type: 'text', text: { content: updates.title } }] };
+    }
+    if (updates.description) {
+      properties.Descripción = { rich_text: [{ type: 'text', text: { content: updates.description.slice(0, 2000) } }] };
+    }
+    if (updates.status) {
+      properties.Estatus = { status: { name: updates.status } };
+    }
+    if (updates.priority) {
+      properties.Prioridad = { select: { name: updates.priority } };
+    }
+    if (updates.due_date) {
+      properties.Fecha = { date: { start: updates.due_date } };
+    }
+    if (updates.project_id) {
+      properties.Proyectos = { relation: [{ id: updates.project_id }] };
+    }
+
+    const response = await notionClient.patch(`/pages/${pageId}`, { properties });
+    console.log(`✅ Página actualizada en Notion: ${pageId}`);
+    return { id: response.data.id, url: response.data.url };
+  } catch (error) {
+    console.error('Notion update error:', error.response?.data || error.message);
+    throw new Error(`No pude editar la página: ${JSON.stringify(error.response?.data || error.message)}`);
+  }
+}
+
+export async function findProjectByName(name) {
+  try {
+    // Buscar en todas las bases de datos relacionadas
+    const response = await notionClient.post('/search', {
+      query: name,
+      filter: { value: 'page', property: 'object' },
+      page_size: 5,
+    });
+    const results = response.data.results || [];
+    // Buscar el que más coincida con el nombre
+    for (const item of results) {
+      const itemTitle = getTitle(item);
+      if (itemTitle.toLowerCase().includes(name.toLowerCase())) {
+        return { id: item.id, title: itemTitle };
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Notion find project error:', error.message);
+    return null;
+  }
+}
+
 export async function getNotionPage(pageId) {
   try {
     const [page, blocks] = await Promise.all([

@@ -44,6 +44,23 @@ const TOOLS = [
     },
   },
   {
+    name: 'update_notion_page',
+    description: 'Edita una página o entrada existente en Notion. Primero usa search_notion para encontrar el ID de la página, luego usa este tool para editarla. Puedes cambiar título, descripción, estado, prioridad, fecha o proyecto.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        page_id: { type: 'string', description: 'ID de la página a editar (obtenido de search_notion)' },
+        title: { type: 'string', description: 'Nuevo título (opcional)' },
+        description: { type: 'string', description: 'Nueva descripción (opcional)' },
+        status: { type: 'string', description: 'Nuevo estado: Inbox, En proceso, Completada (opcional)' },
+        priority: { type: 'string', description: 'Nueva prioridad: Alta, Media, Baja, Urgente (opcional)' },
+        due_date: { type: 'string', description: 'Nueva fecha en formato YYYY-MM-DD (opcional)' },
+        project_name: { type: 'string', description: 'Nombre del proyecto a asignar en Proyectos (opcional)' },
+      },
+      required: ['page_id'],
+    },
+  },
+  {
     name: 'save_memory',
     description: 'Guarda información importante sobre Indira para recordar en el futuro. Úsala cuando el usuario diga "recuerda que...", "anota que...", o comparte info personal importante.',
     input_schema: {
