@@ -2,6 +2,7 @@ import axios from 'axios';
 import { getOrCreateUser, saveConversation, searchMemories, saveMemory } from './supabase.js';
 import { processWithClaude, generateEmbedding } from './claude.js';
 import { getClickUpTasks, createClickUpTask } from './clickup.js';
+import { searchNotion, createNotionPage } from './notion.js';
 
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
 
@@ -32,6 +33,16 @@ export async function handleTelegramMessage(message, supabase) {
       if (toolName === 'create_task') {
         const task = await createClickUpTask(toolInput);
         return { success: true, task_id: task.id, task_name: task.name, url: task.url };
+      }
+
+      if (toolName === 'search_notion') {
+        const results = await searchNotion(toolInput.query);
+        return { results, count: results.length };
+      }
+
+      if (toolName === 'create_notion_page') {
+        const page = await createNotionPage(toolInput.title, toolInput.content, toolInput.parent_page_id);
+        return { success: true, url: page.url, title: page.title };
       }
 
       if (toolName === 'save_memory') {

@@ -19,6 +19,30 @@ const TOOLS = [
     },
   },
   {
+    name: 'search_notion',
+    description: 'Busca páginas o bases de datos en Notion de Indira. Úsala cuando pregunte por algo que puede estar en Notion.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Texto a buscar en Notion' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'create_notion_page',
+    description: 'Crea una nueva página en Notion. Úsala cuando el usuario quiera guardar notas, reuniones, ideas o cualquier contenido en Notion.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Título de la página' },
+        content: { type: 'string', description: 'Contenido de la página en texto plano' },
+        parent_page_id: { type: 'string', description: 'ID de la página padre (opcional)' },
+      },
+      required: ['title', 'content'],
+    },
+  },
+  {
     name: 'save_memory',
     description: 'Guarda información importante sobre Indira para recordar en el futuro. Úsala cuando el usuario diga "recuerda que...", "anota que...", o comparte info personal importante.',
     input_schema: {
