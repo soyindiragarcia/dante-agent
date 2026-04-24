@@ -112,14 +112,11 @@ const TOOLS = [
   },
   {
     name: 'get_google_calendar',
-    description: 'Lee los eventos del Google Calendar de Indira. Tiene 3 cuentas: "clientes" (para reuniones con clientes), "personal" (su calendario personal), "empresa" (Studio Knecta). Úsala cuando pregunte qué tiene en el calendario, sus reuniones, qué tiene esta semana, etc.',
+    description: 'Lee los eventos del Google Calendar de Indira. Puede tener múltiples cuentas autorizadas (ej: "clientes", "personal", "empresa"). Úsala cuando pregunte qué tiene en el calendario, sus reuniones, qué tiene esta semana, hoy, etc. Puedes llamarla varias veces para ver varias cuentas.',
     input_schema: {
       type: 'object',
       properties: {
-        account: {
-          type: 'string',
-          description: 'Cuenta a consultar: "clientes", "personal", o "empresa". Si no especifica, consulta "personal".',
-        },
+        account: { type: 'string', description: 'Nombre de la cuenta a consultar (ej: "clientes", "personal", "empresa"). Si no especifica, usa "personal".' },
         days: { type: 'number', description: 'Cuántos días hacia adelante revisar (default 7)' },
       },
       required: ['account'],
@@ -127,22 +124,95 @@ const TOOLS = [
   },
   {
     name: 'create_google_event',
-    description: 'Crea un evento en el Google Calendar de Indira. Úsala cuando quiera agendar una reunión, llamada, cita, o cualquier evento en su calendario.',
+    description: 'Crea un evento en el Google Calendar de Indira. Úsala cuando quiera agendar una reunión, llamada, cita, o cualquier evento.',
     input_schema: {
       type: 'object',
       properties: {
-        account: {
-          type: 'string',
-          description: 'En qué cuenta crear: "clientes", "personal", o "empresa".',
-        },
+        account: { type: 'string', description: 'En qué cuenta crear el evento (ej: "clientes", "personal", "empresa").' },
         title: { type: 'string', description: 'Título del evento' },
-        description: { type: 'string', description: 'Descripción o notas del evento (opcional)' },
-        start_datetime: { type: 'string', description: 'Fecha y hora de inicio en formato ISO. Ej: 2026-04-25T10:00:00' },
-        end_datetime: { type: 'string', description: 'Fecha y hora de fin en formato ISO. Ej: 2026-04-25T11:00:00' },
-        attendees: { type: 'string', description: 'Emails de asistentes separados por coma (opcional). Ej: juan@email.com, maria@email.com' },
+        description: { type: 'string', description: 'Descripción o notas (opcional)' },
+        start_datetime: { type: 'string', description: 'Fecha y hora de inicio ISO. Ej: 2026-04-25T10:00:00' },
+        end_datetime: { type: 'string', description: 'Fecha y hora de fin ISO. Ej: 2026-04-25T11:00:00' },
+        attendees: { type: 'string', description: 'Emails de asistentes separados por coma (opcional)' },
         location: { type: 'string', description: 'Lugar o link del evento (opcional)' },
       },
       required: ['account', 'title', 'start_datetime', 'end_datetime'],
+    },
+  },
+  {
+    name: 'search_drive',
+    description: 'Busca archivos en el Google Drive de Indira. Puede buscar en cualquiera de sus cuentas. Úsala cuando pregunte por documentos, archivos, presentaciones, hojas de cálculo, etc.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account: { type: 'string', description: 'Nombre de la cuenta de Drive a buscar (ej: "clientes", "personal", "empresa").' },
+        query: { type: 'string', description: 'Texto a buscar en los nombres de archivos' },
+      },
+      required: ['account', 'query'],
+    },
+  },
+  {
+    name: 'read_drive_file',
+    description: 'Lee el contenido de un archivo de Google Drive (Google Docs, Sheets, txt, etc.). Primero usa search_drive para encontrar el ID.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account: { type: 'string', description: 'Nombre de la cuenta' },
+        file_id: { type: 'string', description: 'ID del archivo (obtenido de search_drive)' },
+      },
+      required: ['account', 'file_id'],
+    },
+  },
+  {
+    name: 'create_drive_doc',
+    description: 'Crea un nuevo Google Doc en el Drive de Indira. Úsala cuando quiera crear un documento, actas de reunión, borradores, etc.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account: { type: 'string', description: 'En qué cuenta de Drive crear el documento' },
+        title: { type: 'string', description: 'Título del documento' },
+        content: { type: 'string', description: 'Contenido del documento' },
+      },
+      required: ['account', 'title', 'content'],
+    },
+  },
+  {
+    name: 'get_emails',
+    description: 'Lee los emails recientes de una cuenta de Gmail de Indira. Úsala cuando pregunte por sus correos, emails recibidos, emails no leídos, etc.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account: { type: 'string', description: 'Nombre de la cuenta de Gmail (ej: "clientes", "personal", "empresa").' },
+        max_results: { type: 'number', description: 'Cuántos emails traer (default 10)' },
+        query: { type: 'string', description: 'Filtro de búsqueda Gmail (ej: "is:unread", "from:juan@email.com", "subject:presupuesto"). Default: inbox reciente.' },
+      },
+      required: ['account'],
+    },
+  },
+  {
+    name: 'read_email',
+    description: 'Lee el contenido completo de un email específico. Primero usa get_emails para ver los IDs.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account: { type: 'string', description: 'Nombre de la cuenta' },
+        message_id: { type: 'string', description: 'ID del mensaje (obtenido de get_emails)' },
+      },
+      required: ['account', 'message_id'],
+    },
+  },
+  {
+    name: 'send_email',
+    description: 'Envía un email desde una cuenta de Gmail de Indira. Úsala cuando quiera responder o enviar un correo.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account: { type: 'string', description: 'Desde qué cuenta enviar (ej: "clientes", "personal", "empresa").' },
+        to: { type: 'string', description: 'Email del destinatario' },
+        subject: { type: 'string', description: 'Asunto del correo' },
+        body: { type: 'string', description: 'Cuerpo del correo' },
+      },
+      required: ['account', 'to', 'subject', 'body'],
     },
   },
 ];
@@ -165,8 +235,14 @@ CAPACIDADES REALES:
 
 CUÁNDO USAR HERRAMIENTAS:
 - create_task: cuando el usuario quiera crear una tarea en ClickUp
-- get_google_calendar: cuando pregunte por su agenda, reuniones, qué tiene esta semana, qué tiene hoy, etc. Si no especifica cuenta, usa "personal". Puedes llamarla 3 veces para ver las 3 cuentas.
+- get_google_calendar: cuando pregunte por su agenda, reuniones, qué tiene esta semana/hoy. Si no especifica cuenta usa "personal". Puedes llamarla varias veces para ver varias cuentas.
 - create_google_event: cuando quiera agendar algo en Google Calendar
+- search_drive: cuando pregunte por archivos, documentos, presentaciones en su Drive
+- read_drive_file: después de search_drive, para leer el contenido de un archivo específico
+- create_drive_doc: cuando quiera crear un documento en Drive
+- get_emails: cuando pregunte por sus correos o emails recibidos
+- read_email: para leer el contenido completo de un email específico
+- send_email: cuando quiera enviar o responder un correo
 - search_notion: cuando el usuario pregunte algo que puede estar en Notion, o antes de editar
 - update_notion_page: después de search_notion, para editar la página encontrada
 - create_notion_page: cuando el usuario quiera crear algo nuevo en Notion
@@ -182,7 +258,7 @@ REGLAS CRÍTICAS:
 
   const messages = [{ role: 'user', content: userMessage }];
   let totalTokens = 0;
-  const MAX_TOOL_CALLS = 6;
+  const MAX_TOOL_CALLS = 10;
   let toolCallCount = 0;
 
   try {

@@ -5,6 +5,8 @@ import { getClickUpTasks, createClickUpTask } from './clickup.js';
 import { getUpcomingBookings, getAvailability } from './calcom.js';
 import { searchNotion, createNotionPage, updateNotionPage, findProjectByName, findResourceByName, queryDatabase } from './notion.js';
 import { getGoogleCalendarEvents, createGoogleCalendarEvent } from './google-calendar.js';
+import { searchDrive, readDriveFile, createDriveDoc } from './google-drive.js';
+import { getEmails, readEmail, sendEmail } from './gmail.js';
 
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
 
@@ -99,6 +101,36 @@ export async function handleTelegramMessage(message, supabase) {
       if (toolName === 'create_google_event') {
         const event = await createGoogleCalendarEvent(toolInput.account, toolInput);
         return { success: true, event_id: event.id, url: event.url, title: event.title };
+      }
+
+      if (toolName === 'search_drive') {
+        const files = await searchDrive(toolInput.account, toolInput.query);
+        return { files, count: Array.isArray(files) ? files.length : 0 };
+      }
+
+      if (toolName === 'read_drive_file') {
+        const file = await readDriveFile(toolInput.account, toolInput.file_id);
+        return file;
+      }
+
+      if (toolName === 'create_drive_doc') {
+        const doc = await createDriveDoc(toolInput.account, toolInput.title, toolInput.content);
+        return { success: true, id: doc.id, url: doc.url, title: doc.title };
+      }
+
+      if (toolName === 'get_emails') {
+        const emails = await getEmails(toolInput.account, toolInput.max_results || 10, toolInput.query || '');
+        return { emails, count: Array.isArray(emails) ? emails.length : 0 };
+      }
+
+      if (toolName === 'read_email') {
+        const email = await readEmail(toolInput.account, toolInput.message_id);
+        return email;
+      }
+
+      if (toolName === 'send_email') {
+        const result = await sendEmail(toolInput.account, toolInput);
+        return result;
       }
 
       return { error: `Herramienta desconocida: ${toolName}` };

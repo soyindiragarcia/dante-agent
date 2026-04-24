@@ -1,8 +1,18 @@
 import { google } from 'googleapis';
+import { createClient } from '@supabase/supabase-js';
 
 const REDIRECT_URI = process.env.NODE_ENV === 'production'
   ? 'https://dante-agent-production.up.railway.app/auth/google/callback'
   : 'http://localhost:3001/auth/google/callback';
+
+// Scopes completos: Calendar + Drive + Gmail + perfil
+export const GOOGLE_SCOPES = [
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/drive',
+  'https://www.googleapis.com/auth/gmail.modify',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
+];
 
 function createOAuthClient() {
   return new google.auth.OAuth2(
@@ -12,43 +22,80 @@ function createOAuthClient() {
   );
 }
 
-// Genera la URL de autorización para una cuenta
-export function getAuthUrl(account) {
-  const oauth2Client = createOAuthClient();
-  return oauth2Client.generateAuthUrl({
-    access_type: 'offline',
-    scope: [
-      'https://www.googleapis.com/auth/calendar.readonly',
-      'https://www.googleapis.com/auth/calendar.events',
-    ],
-    state: account,
-    prompt: 'consent',
-  });
-}
-
-// Intercambia el code por tokens
-export async function handleGoogleCallback(code) {
-  const oauth2Client = createOAuthClient();
-  const { tokens } = await oauth2Client.getToken(code);
-  return tokens;
-}
-
-// Crea cliente autenticado para una cuenta específica
-function getAuthClient(account) {
-  const tokenKey = `GOOGLE_REFRESH_TOKEN_${account.toUpperCase()}`;
-  const refreshToken = process.env[tokenKey];
-  if (!refreshToken) {
-    throw new Error(`No hay token para la cuenta "${account}". Autoriza en /auth/google?account=${account}`);
+let _supabase = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
   }
+  return _supabase;
+}
+
+// Guarda o actualiza una cuenta en Supabase
+export async function saveGoogleAccount(name, email, refreshToken) {
+  const { error } = await getSupabase()
+    .from('google_accounts')
+    .upsert({ name, email, refresh_token: refreshToken, updated_at: new Date().toISOString() }, { onConflict: 'name' });
+  if (error) throw new Error(`Error guardando cuenta: ${error.message}`);
+  console.log(`✅ Cuenta Google guardada: ${name} (${email})`);
+}
+
+// Obtiene el refresh_token de una cuenta desde Supabase
+async function getRefreshToken(accountName) {
+  const { data, error } = await getSupabase()
+    .from('google_accounts')
+    .select('refresh_token, email')
+    .eq('name', accountName)
+    .single();
+  if (error || !data) throw new Error(`Cuenta "${accountName}" no encontrada. Autoriza en /auth/google?account=${accountName}`);
+  return data.refresh_token;
+}
+
+// Lista todas las cuentas autorizadas
+export async function listGoogleAccounts() {
+  const { data } = await getSupabase()
+    .from('google_accounts')
+    .select('name, email, updated_at')
+    .order('name');
+  return data || [];
+}
+
+// Crea cliente autenticado para una cuenta
+export async function getAuthClient(accountName) {
+  const refreshToken = await getRefreshToken(accountName);
   const oauth2Client = createOAuthClient();
   oauth2Client.setCredentials({ refresh_token: refreshToken });
   return oauth2Client;
 }
 
-// Lee eventos del calendario
-export async function getGoogleCalendarEvents(account, days = 7) {
+// Genera URL de autorización
+export function getAuthUrl(account) {
+  const oauth2Client = createOAuthClient();
+  return oauth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: GOOGLE_SCOPES,
+    state: account,
+    prompt: 'consent',
+  });
+}
+
+// Intercambia código por tokens y obtiene email del usuario
+export async function handleGoogleCallback(code) {
+  const oauth2Client = createOAuthClient();
+  const { tokens } = await oauth2Client.getToken(code);
+  oauth2Client.setCredentials(tokens);
+
+  // Obtener el email de la cuenta
+  const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+  const { data: userInfo } = await oauth2.userinfo.get();
+
+  return { tokens, email: userInfo.email };
+}
+
+// ── CALENDAR ──────────────────────────────────────────────
+
+export async function getGoogleCalendarEvents(accountName, days = 7) {
   try {
-    const auth = getAuthClient(account);
+    const auth = await getAuthClient(accountName);
     const calendar = google.calendar({ version: 'v3', auth });
 
     const now = new Date();
@@ -65,7 +112,7 @@ export async function getGoogleCalendarEvents(account, days = 7) {
     });
 
     const events = response.data.items || [];
-    console.log(`📅 Google Calendar (${account}): ${events.length} eventos`);
+    console.log(`📅 Google Calendar (${accountName}): ${events.length} eventos`);
 
     return events.map(event => ({
       id: event.id,
@@ -78,15 +125,14 @@ export async function getGoogleCalendarEvents(account, days = 7) {
       meetLink: event.hangoutLink || '',
     }));
   } catch (error) {
-    console.error(`Google Calendar error (${account}):`, error.message);
-    return [];
+    console.error(`Google Calendar error (${accountName}):`, error.message);
+    return { error: error.message };
   }
 }
 
-// Crea un evento en el calendario
-export async function createGoogleCalendarEvent(account, { title, description, start_datetime, end_datetime, attendees, location }) {
+export async function createGoogleCalendarEvent(accountName, { title, description, start_datetime, end_datetime, attendees, location }) {
   try {
-    const auth = getAuthClient(account);
+    const auth = await getAuthClient(accountName);
     const calendar = google.calendar({ version: 'v3', auth });
 
     const event = {
@@ -107,14 +153,10 @@ export async function createGoogleCalendarEvent(account, { title, description, s
       sendUpdates: attendees ? 'all' : 'none',
     });
 
-    console.log(`✅ Evento creado en Google Calendar (${account}): ${title}`);
-    return {
-      id: response.data.id,
-      url: response.data.htmlLink,
-      title,
-    };
+    console.log(`✅ Evento creado (${accountName}): ${title}`);
+    return { id: response.data.id, url: response.data.htmlLink, title };
   } catch (error) {
-    console.error(`Google Calendar create error (${account}):`, error.message);
+    console.error(`Google Calendar create error (${accountName}):`, error.message);
     throw new Error(`No pude crear el evento: ${error.message}`);
   }
 }
