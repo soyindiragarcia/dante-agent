@@ -1,9 +1,7 @@
 import { google } from 'googleapis';
 import { createClient } from '@supabase/supabase-js';
 
-const REDIRECT_URI = process.env.NODE_ENV === 'production'
-  ? 'https://dante-agent-production.up.railway.app/auth/google/callback'
-  : 'http://localhost:3001/auth/google/callback';
+const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3001/auth/google/callback';
 
 // Scopes completos: Calendar + Drive + Gmail + perfil
 export const GOOGLE_SCOPES = [
