@@ -2,7 +2,7 @@ import axios from 'axios';
 import { getOrCreateUser, saveConversation, searchMemories, saveMemory } from './supabase.js';
 import { processWithClaude, generateEmbedding } from './claude.js';
 import { getClickUpTasks, createClickUpTask } from './clickup.js';
-import { searchNotion, createNotionPage, updateNotionPage, findProjectByName, findResourceByName } from './notion.js';
+import { searchNotion, createNotionPage, updateNotionPage, findProjectByName, findResourceByName, queryDatabase } from './notion.js';
 
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
 
@@ -33,6 +33,20 @@ export async function handleTelegramMessage(message, supabase) {
       if (toolName === 'create_task') {
         const task = await createClickUpTask(toolInput);
         return { success: true, task_id: task.id, task_name: task.name, url: task.url };
+      }
+
+      if (toolName === 'query_notion_database') {
+        const dbMap = {
+          proyectos: process.env.NOTION_PROJECTS_DB_ID,
+          recursos: process.env.NOTION_RECURSOS_DB_ID,
+          temas: process.env.NOTION_TEMAS_DB_ID,
+          areas: process.env.NOTION_AREAS_DB_ID,
+          clientes: process.env.NOTION_CLIENTES_DB_ID,
+        };
+        const dbId = dbMap[toolInput.database?.toLowerCase()];
+        if (!dbId) return { error: `Base de datos "${toolInput.database}" no encontrada` };
+        const results = await queryDatabase(dbId, toolInput.search);
+        return { results, count: results.length };
       }
 
       if (toolName === 'search_notion') {

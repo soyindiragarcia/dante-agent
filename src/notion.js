@@ -131,6 +131,23 @@ export async function findProjectByName(name) {
   }
 }
 
+export async function queryDatabase(dbId, searchName = null) {
+  try {
+    const response = await notionClient.post(`/databases/${dbId}/query`, { page_size: 50 });
+    const results = response.data.results || [];
+    return results.map(item => {
+      const titleProp = Object.values(item.properties).find(v => v.type === 'title');
+      const title = titleProp?.title?.[0]?.plain_text || 'sin título';
+      return { id: item.id, title, url: item.url };
+    }).filter(item =>
+      !searchName || item.title.toLowerCase().includes(searchName.toLowerCase())
+    );
+  } catch (error) {
+    console.error('Notion queryDatabase error:', error.message);
+    return [];
+  }
+}
+
 export async function findResourceByName(name) {
   try {
     const dbId = process.env.NOTION_RECURSOS_DB_ID;

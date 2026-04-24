@@ -44,6 +44,21 @@ const TOOLS = [
     },
   },
   {
+    name: 'query_notion_database',
+    description: 'Consulta una base de datos específica de Notion de Indira. Úsala para ver el contenido de Proyectos, Recursos, Temas, Áreas o Clientes.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        database: {
+          type: 'string',
+          description: 'Cuál base de datos consultar: "proyectos", "recursos", "temas", "areas", "clientes"',
+        },
+        search: { type: 'string', description: 'Término de búsqueda opcional para filtrar resultados' },
+      },
+      required: ['database'],
+    },
+  },
+  {
     name: 'update_notion_page',
     description: 'Edita una página o entrada existente en Notion. Primero usa search_notion para encontrar el ID de la página, luego usa este tool para editarla. Puedes cambiar título, descripción, estado, prioridad, fecha o proyecto.',
     input_schema: {
