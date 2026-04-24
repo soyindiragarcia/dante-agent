@@ -4,7 +4,7 @@ import { processWithClaude, generateEmbedding } from './claude.js';
 import { getClickUpTasks, createClickUpTask } from './clickup.js';
 import { getUpcomingBookings, getAvailability } from './calcom.js';
 import { searchNotion, createNotionPage, updateNotionPage, findProjectByName, findResourceByName, queryDatabase } from './notion.js';
-import { getGoogleCalendarEvents, createGoogleCalendarEvent } from './google-calendar.js';
+import { getGoogleCalendarEvents, createGoogleCalendarEvent, listGoogleAccounts } from './google-calendar.js';
 import { searchDrive, readDriveFile, createDriveDoc } from './google-drive.js';
 import { getEmails, readEmail, sendEmail } from './gmail.js';
 
@@ -23,12 +23,20 @@ export async function handleTelegramMessage(message, supabase) {
 
     const memories = await searchMemories(supabase, user.id, text, userEmbedding, 3);
 
-    const clickupTasks = await getClickUpTasks();
+    const [clickupTasks, googleAccounts] = await Promise.all([
+      getClickUpTasks(),
+      listGoogleAccounts(),
+    ]);
+
     const tasksContext = clickupTasks.length > 0
       ? `\n\nTareas pendientes en ClickUp:\n${clickupTasks.slice(0, 5).map(t => `- ${t.name} [${t.status?.status || 'open'}]`).join('\n')}`
       : '';
 
-    const fullMessage = text + tasksContext;
+    const accountsContext = googleAccounts.length > 0
+      ? `\n\nCuentas de Google autorizadas (usa EXACTAMENTE estos nombres):\n${googleAccounts.map(a => `- "${a.name}" → ${a.email}`).join('\n')}`
+      : '';
+
+    const fullMessage = text + tasksContext + accountsContext;
 
     // Manejador de tool calls
     const handleToolCall = async (toolName, toolInput) => {
