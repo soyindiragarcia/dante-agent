@@ -30,7 +30,6 @@ export async function createClickUpTask({ name, description = '', due_date = nul
       name,
       description,
       assignees: userId ? [parseInt(userId)] : [],
-      status: 'open',
     };
 
     if (due_date) {
