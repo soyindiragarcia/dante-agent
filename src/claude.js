@@ -50,21 +50,16 @@ REGLAS IMPORTANTES:
 }
 
 export async function generateEmbedding(text) {
+  // Genera un vector simple basado en hash del texto para búsqueda aproximada
+  // En producción real se usaría Voyage AI o similar
   try {
-    const response = await client.messages.create({
-      model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-5',
-      max_tokens: 1024,
-      messages: [
-        {
-          role: 'user',
-          content: `Return a JSON object with an "embedding" array of 1536 numbers representing the semantic meaning of this text. Only return valid JSON, no other text.\n\nText: ${text}`,
-        },
-      ],
-    });
-
-    const content = response.content[0].type === 'text' ? response.content[0].text : '{}';
-    const parsed = JSON.parse(content);
-    return parsed.embedding || null;
+    const vector = new Array(1536).fill(0);
+    for (let i = 0; i < text.length; i++) {
+      vector[i % 1536] += text.charCodeAt(i) / 1000;
+    }
+    // Normalizar
+    const magnitude = Math.sqrt(vector.reduce((sum, v) => sum + v * v, 0));
+    return magnitude > 0 ? vector.map(v => v / magnitude) : vector;
   } catch (error) {
     console.error('Embedding error:', error.message);
     return null;
