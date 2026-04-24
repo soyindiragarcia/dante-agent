@@ -14,9 +14,6 @@ export async function getClickUpTasks(teamId = process.env.CLICKUP_TEAM_ID) {
     });
     const tasks = response.data.tasks || [];
     console.log(`📋 ClickUp: ${tasks.length} tareas encontradas`);
-    if (tasks.length > 0) {
-      console.log('📋 Primera tarea:', tasks[0].name, '| Asignados:', JSON.stringify(tasks[0].assignees?.map(a => a.id)));
-    }
     return tasks;
   } catch (error) {
     console.error('ClickUp error:', error.response?.data || error.message);
@@ -24,16 +21,31 @@ export async function getClickUpTasks(teamId = process.env.CLICKUP_TEAM_ID) {
   }
 }
 
-export async function createClickUpTask(listId, name, description = '') {
+export async function createClickUpTask({ name, description = '', due_date = null }) {
   try {
-    const response = await clickupClient.post(`/list/${listId}/task`, {
+    const listId = process.env.CLICKUP_LIST_ID;
+    const userId = process.env.CLICKUP_USER_ID;
+
+    const body = {
       name,
       description,
+      assignees: userId ? [parseInt(userId)] : [],
       status: 'open',
-    });
-    return response.data;
+    };
+
+    if (due_date) {
+      body.due_date = new Date(due_date).getTime();
+    }
+
+    const response = await clickupClient.post(`/list/${listId}/task`, body);
+    console.log(`✅ Tarea creada en ClickUp: ${name}`);
+    return {
+      id: response.data.id,
+      name: response.data.name,
+      url: response.data.url,
+    };
   } catch (error) {
-    console.error('ClickUp create error:', error.message);
-    return null;
+    console.error('ClickUp create error:', error.response?.data || error.message);
+    throw new Error(`No pude crear la tarea: ${error.message}`);
   }
 }

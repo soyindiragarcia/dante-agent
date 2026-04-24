@@ -42,6 +42,18 @@ export async function saveConversation(supabase, userId, role, content, embeddin
   return data[0];
 }
 
+export async function saveMemory(supabase, userId, key, value) {
+  const content = `[MEMORIA] ${key}: ${value}`;
+  const { error } = await supabase.from('conversations').insert({
+    user_id: userId,
+    message_role: 'memory',
+    content,
+    source: 'telegram',
+  });
+  if (error) console.warn('Save memory error:', error.message);
+  return { key, value };
+}
+
 export async function searchMemories(supabase, userId, query, embedding, limit = 3) {
   if (!embedding) return [];
 

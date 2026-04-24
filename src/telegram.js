@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { getOrCreateUser, saveConversation, searchMemories } from './supabase.js';
+import { getOrCreateUser, saveConversation, searchMemories, saveMemory } from './supabase.js';
 import { processWithClaude, generateEmbedding } from './claude.js';
-import { getClickUpTasks } from './clickup.js';
+import { getClickUpTasks, createClickUpTask } from './clickup.js';
 
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
 
@@ -13,20 +13,38 @@ export async function handleTelegramMessage(message, supabase) {
   try {
     const user = await getOrCreateUser(supabase, from.id, from.first_name, from.username);
 
-    const userEmbedding = await generateEmbedding(text);
+    const userEmbedding = generateEmbedding(text);
     await saveConversation(supabase, user.id, 'user', text, userEmbedding);
 
     const memories = await searchMemories(supabase, user.id, text, userEmbedding, 3);
 
     const clickupTasks = await getClickUpTasks();
     const tasksContext = clickupTasks.length > 0
-      ? `\n\nTareas pendientes:\n${clickupTasks.slice(0, 3).map((t) => `- ${t.name}`).join('\n')}`
+      ? `\n\nTareas pendientes en ClickUp:\n${clickupTasks.slice(0, 5).map(t => `- ${t.name} [${t.status?.status || 'open'}]`).join('\n')}`
       : '';
 
     const fullMessage = text + tasksContext;
-    const response = await processWithClaude(fullMessage, memories);
 
-    const responseEmbedding = await generateEmbedding(response.content);
+    // Manejador de tool calls
+    const handleToolCall = async (toolName, toolInput) => {
+      console.log(`🔧 Tool call: ${toolName}`, toolInput);
+
+      if (toolName === 'create_task') {
+        const task = await createClickUpTask(toolInput);
+        return { success: true, task_id: task.id, task_name: task.name, url: task.url };
+      }
+
+      if (toolName === 'save_memory') {
+        await saveMemory(supabase, user.id, toolInput.key, toolInput.value);
+        return { success: true, message: `Memoria guardada: ${toolInput.key}` };
+      }
+
+      return { error: `Herramienta desconocida: ${toolName}` };
+    };
+
+    const response = await processWithClaude(fullMessage, memories, handleToolCall);
+
+    const responseEmbedding = generateEmbedding(response.content);
     await saveConversation(supabase, user.id, 'assistant', response.content, responseEmbedding);
 
     await sendMessage(chat.id, response.content);
@@ -43,8 +61,17 @@ async function sendMessage(chatId, text) {
     await axios.post(`${TELEGRAM_API_URL}/sendMessage`, {
       chat_id: chatId,
       text,
+      parse_mode: 'Markdown',
     });
   } catch (error) {
-    console.error('Telegram error:', error.message);
+    // Retry without markdown if formatting fails
+    try {
+      await axios.post(`${TELEGRAM_API_URL}/sendMessage`, {
+        chat_id: chatId,
+        text,
+      });
+    } catch (e) {
+      console.error('Telegram error:', e.message);
+    }
   }
 }
