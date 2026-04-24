@@ -44,7 +44,8 @@ export async function createClickUpTask({ name, description = '', due_date = nul
       url: response.data.url,
     };
   } catch (error) {
-    console.error('ClickUp create error:', error.response?.data || error.message);
-    throw new Error(`No pude crear la tarea: ${error.message}`);
+    const detail = JSON.stringify(error.response?.data || error.message);
+    console.error('ClickUp create error detail:', detail);
+    throw new Error(`No pude crear la tarea: ${detail}`);
   }
 }
