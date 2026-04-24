@@ -56,6 +56,7 @@ const TOOLS = [
         priority: { type: 'string', description: 'Nueva prioridad: Alta, Media, Baja, Urgente (opcional)' },
         due_date: { type: 'string', description: 'Nueva fecha en formato YYYY-MM-DD (opcional)' },
         project_name: { type: 'string', description: 'Nombre del proyecto a asignar en Proyectos (opcional)' },
+        resource_name: { type: 'string', description: 'Nombre del recurso a asignar en Recursos (opcional). Ej: CANVA, GPTS, Prompts' },
       },
       required: ['page_id'],
     },

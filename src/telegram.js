@@ -2,7 +2,7 @@ import axios from 'axios';
 import { getOrCreateUser, saveConversation, searchMemories, saveMemory } from './supabase.js';
 import { processWithClaude, generateEmbedding } from './claude.js';
 import { getClickUpTasks, createClickUpTask } from './clickup.js';
-import { searchNotion, createNotionPage, updateNotionPage, findProjectByName } from './notion.js';
+import { searchNotion, createNotionPage, updateNotionPage, findProjectByName, findResourceByName } from './notion.js';
 
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
 
@@ -50,9 +50,11 @@ export async function handleTelegramMessage(message, supabase) {
         // Si hay project_name, buscar su ID primero
         if (toolInput.project_name) {
           const project = await findProjectByName(toolInput.project_name);
-          if (project) {
-            updates.project_id = project.id;
-          }
+          if (project) updates.project_id = project.id;
+        }
+        if (toolInput.resource_name) {
+          const resource = await findResourceByName(toolInput.resource_name);
+          if (resource) updates.resource_id = resource.id;
         }
         const result = await updateNotionPage(toolInput.page_id, updates);
         return { success: true, url: result.url };

@@ -92,6 +92,9 @@ export async function updateNotionPage(pageId, updates) {
     if (updates.project_id) {
       properties.Proyectos = { relation: [{ id: updates.project_id }] };
     }
+    if (updates.resource_id) {
+      properties.Recursos = { relation: [{ id: updates.resource_id }] };
+    }
 
     const response = await notionClient.patch(`/pages/${pageId}`, { properties });
     console.log(`✅ Página actualizada en Notion: ${pageId}`);
@@ -124,6 +127,28 @@ export async function findProjectByName(name) {
     return null;
   } catch (error) {
     console.error('Notion find project error:', error.message);
+    return null;
+  }
+}
+
+export async function findResourceByName(name) {
+  try {
+    const dbId = process.env.NOTION_RECURSOS_DB_ID;
+    if (!dbId) return null;
+
+    const response = await notionClient.post(`/databases/${dbId}/query`, { page_size: 50 });
+    const results = response.data.results || [];
+    for (const item of results) {
+      const titleProp = Object.values(item.properties).find(v => v.type === 'title');
+      const title = titleProp?.title?.[0]?.plain_text || '';
+      if (title.toLowerCase().includes(name.toLowerCase())) {
+        console.log(`✅ Recurso encontrado: ${title} (${item.id})`);
+        return { id: item.id, title };
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Notion find resource error:', error.message);
     return null;
   }
 }
