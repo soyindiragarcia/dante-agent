@@ -88,72 +88,79 @@ CAPACIDADES REALES:
 - Recordar contexto de conversaciones anteriores
 
 CUÁNDO USAR HERRAMIENTAS:
-- create_task: cuando el usuario quiera crear una tarea, recordatorio, o acción pendiente
-- save_memory: cuando el usuario diga "recuerda que...", "anota que...", o comparta info importante
+- create_task: cuando el usuario quiera crear una tarea en ClickUp
+- search_notion: cuando el usuario pregunte algo que puede estar en Notion, o antes de editar
+- update_notion_page: después de search_notion, para editar la página encontrada
+- create_notion_page: cuando el usuario quiera crear algo nuevo en Notion
+- save_memory: cuando el usuario diga "recuerda que..." o comparta info personal importante
 
-REGLAS:
+REGLAS CRÍTICAS:
 - Responde SIEMPRE en español natural y conversacional
-- NUNCA muestres código, scripts, ni procesos técnicos
-- NUNCA inventes tareas o datos — usa solo lo que se te proporciona
-- Si no hay tareas en el mensaje, di que no hay tareas pendientes
-- Sé directo, conciso y accionable
-- Cuando crees una tarea, confirma con el link de ClickUp${memoryContext}`;
+- NUNCA muestres código ni procesos técnicos
+- NUNCA inventes datos — usa solo lo que se te proporciona
+- Si el usuario pide editar algo en Notion: PRIMERO busca con search_notion, LUEGO edita con update_notion_page
+- NO menciones ClickUp si el usuario está hablando de Notion o algo diferente
+- Sé directo y accionable — confirma cuando hagas algo${memoryContext}`;
 
   const messages = [{ role: 'user', content: userMessage }];
+  let totalTokens = 0;
+  const MAX_TOOL_CALLS = 6;
+  let toolCallCount = 0;
 
   try {
-    const response = await client.messages.create({
+    let response = await client.messages.create({
       model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-5',
       max_tokens: 2048,
       system: systemPrompt,
       tools: TOOLS,
       messages,
     });
+    totalTokens += response.usage.input_tokens + response.usage.output_tokens;
 
-    // Si Claude quiere usar una herramienta
-    if (response.stop_reason === 'tool_use') {
-      const toolUseBlock = response.content.find(b => b.type === 'tool_use');
-      let toolResult = null;
+    // Loop agentivo: permite múltiples tool calls en secuencia
+    while (response.stop_reason === 'tool_use' && toolCallCount < MAX_TOOL_CALLS) {
+      const toolUseBlocks = response.content.filter(b => b.type === 'tool_use');
+      const toolResults = [];
 
-      if (toolUseBlock && onToolCall) {
-        toolResult = await onToolCall(toolUseBlock.name, toolUseBlock.input);
+      for (const toolUseBlock of toolUseBlocks) {
+        toolCallCount++;
+        console.log(`🔧 Tool call ${toolCallCount}: ${toolUseBlock.name}`);
+        let toolResult = null;
+
+        if (onToolCall) {
+          try {
+            toolResult = await onToolCall(toolUseBlock.name, toolUseBlock.input);
+          } catch (err) {
+            toolResult = { error: err.message };
+          }
+        }
+
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: toolUseBlock.id,
+          content: JSON.stringify(toolResult || { error: 'No se pudo ejecutar' }),
+        });
       }
 
-      // Enviamos el resultado de la herramienta de vuelta a Claude
-      const continueMessages = [
-        ...messages,
-        { role: 'assistant', content: response.content },
-        {
-          role: 'user',
-          content: [{
-            type: 'tool_result',
-            tool_use_id: toolUseBlock.id,
-            content: JSON.stringify(toolResult || { error: 'No se pudo ejecutar la herramienta' }),
-          }],
-        },
-      ];
+      // Añadir respuesta del asistente y resultados al historial
+      messages.push({ role: 'assistant', content: response.content });
+      messages.push({ role: 'user', content: toolResults });
 
-      const finalResponse = await client.messages.create({
+      // Llamar a Claude de nuevo con los resultados
+      response = await client.messages.create({
         model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-5',
         max_tokens: 1024,
         system: systemPrompt,
         tools: TOOLS,
-        messages: continueMessages,
+        messages,
       });
-
-      const text = finalResponse.content.find(b => b.type === 'text');
-      return {
-        content: text?.text || '✅ Hecho.',
-        tokens: (response.usage.input_tokens + response.usage.output_tokens +
-                 finalResponse.usage.input_tokens + finalResponse.usage.output_tokens),
-      };
+      totalTokens += response.usage.input_tokens + response.usage.output_tokens;
     }
 
-    // Respuesta de texto normal
     const text = response.content.find(b => b.type === 'text');
     return {
-      content: text?.text || 'Sin respuesta',
-      tokens: response.usage.input_tokens + response.usage.output_tokens,
+      content: text?.text || '✅ Hecho.',
+      tokens: totalTokens,
     };
 
   } catch (error) {
