@@ -4,7 +4,7 @@ import { processWithClaude, generateEmbedding } from './claude.js';
 import { getClickUpTasks, createClickUpTask } from './clickup.js';
 import { getUpcomingBookings, getAvailability } from './calcom.js';
 import { searchNotion, createNotionPage, updateNotionPage, findProjectByName, findResourceByName, queryDatabase } from './notion.js';
-import { getGoogleCalendarEvents, createGoogleCalendarEvent, listGoogleAccounts } from './google-calendar.js';
+import { getGoogleCalendarEvents, createGoogleCalendarEvent, listGoogleAccounts, getAllCalendarEvents } from './google-calendar.js';
 import { searchDrive, readDriveFile, createDriveDoc } from './google-drive.js';
 import { getEmails, readEmail, sendEmail } from './gmail.js';
 
@@ -101,9 +101,14 @@ export async function handleTelegramMessage(message, supabase) {
         return { success: true, message: `Memoria guardada: ${toolInput.key}` };
       }
 
+      if (toolName === 'get_all_calendars') {
+        const events = await getAllCalendarEvents(toolInput.days || 7);
+        return { events, count: events.length };
+      }
+
       if (toolName === 'get_google_calendar') {
         const events = await getGoogleCalendarEvents(toolInput.account, toolInput.days || 7);
-        return { events, count: events.length, account: toolInput.account };
+        return { events, count: Array.isArray(events) ? events.length : 0, account: toolInput.account };
       }
 
       if (toolName === 'create_google_event') {

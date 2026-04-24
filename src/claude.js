@@ -111,8 +111,19 @@ const TOOLS = [
     },
   },
   {
+    name: 'get_all_calendars',
+    description: 'Obtiene los eventos de TODOS los Google Calendars de Indira de una sola vez. Úsala cuando pregunte qué tiene esta semana, hoy, sus reuniones en general, o cuando no especifique una cuenta en particular.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        days: { type: 'number', description: 'Cuántos días hacia adelante revisar (default 7)' },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'get_google_calendar',
-    description: 'Lee los eventos del Google Calendar de Indira. Puede tener múltiples cuentas autorizadas (ej: "clientes", "personal", "empresa"). Úsala cuando pregunte qué tiene en el calendario, sus reuniones, qué tiene esta semana, hoy, etc. Puedes llamarla varias veces para ver varias cuentas.',
+    description: 'Lee los eventos de UN Google Calendar específico de Indira. Úsala cuando mencione una cuenta concreta (ej: "mi calendario de propuestas", "el de obtenmasclientes").',
     input_schema: {
       type: 'object',
       properties: {
@@ -235,7 +246,8 @@ CAPACIDADES REALES:
 
 CUÁNDO USAR HERRAMIENTAS:
 - create_task: cuando el usuario quiera crear una tarea en ClickUp
-- get_google_calendar: cuando pregunte por su agenda, reuniones, qué tiene esta semana/hoy. Si no especifica cuenta usa "personal". Puedes llamarla varias veces para ver varias cuentas.
+- get_all_calendars: SIEMPRE que pregunte por su agenda, reuniones, qué tiene esta semana/hoy sin especificar cuenta. Revisa TODOS los calendarios de una vez.
+- get_google_calendar: solo cuando mencione una cuenta específica (ej: "el calendario de propuestas").
 - create_google_event: cuando quiera agendar algo en Google Calendar
 - search_drive: cuando pregunte por archivos, documentos, presentaciones en su Drive
 - read_drive_file: después de search_drive, para leer el contenido de un archivo específico

@@ -91,6 +91,25 @@ export async function handleGoogleCallback(code) {
 
 // ── CALENDAR ──────────────────────────────────────────────
 
+// Obtiene eventos de TODAS las cuentas autorizadas de una vez
+export async function getAllCalendarEvents(days = 7) {
+  const accounts = await listGoogleAccounts();
+  if (!accounts.length) return [];
+
+  const results = await Promise.allSettled(
+    accounts.map(async (acc) => {
+      const events = await getGoogleCalendarEvents(acc.name, days);
+      const list = Array.isArray(events) ? events : [];
+      return list.map(e => ({ ...e, account: acc.name, email: acc.email }));
+    })
+  );
+
+  return results
+    .filter(r => r.status === 'fulfilled')
+    .flatMap(r => r.value)
+    .sort((a, b) => new Date(a.start) - new Date(b.start));
+}
+
 export async function getGoogleCalendarEvents(accountName, days = 7) {
   try {
     const auth = await getAuthClient(accountName);
