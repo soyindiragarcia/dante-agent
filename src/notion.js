@@ -104,20 +104,23 @@ export async function updateNotionPage(pageId, updates) {
 
 export async function findProjectByName(name) {
   try {
-    // Buscar en todas las bases de datos relacionadas
-    const response = await notionClient.post('/search', {
-      query: name,
-      filter: { value: 'page', property: 'object' },
-      page_size: 5,
+    const dbId = process.env.NOTION_PROJECTS_DB_ID;
+    if (!dbId) return null;
+
+    const response = await notionClient.post(`/databases/${dbId}/query`, {
+      page_size: 50,
     });
+
     const results = response.data.results || [];
-    // Buscar el que más coincida con el nombre
     for (const item of results) {
-      const itemTitle = getTitle(item);
-      if (itemTitle.toLowerCase().includes(name.toLowerCase())) {
-        return { id: item.id, title: itemTitle };
+      const titleProp = Object.values(item.properties).find(v => v.type === 'title');
+      const title = titleProp?.title?.[0]?.plain_text || '';
+      if (title.toLowerCase().includes(name.toLowerCase())) {
+        console.log(`✅ Proyecto encontrado: ${title} (${item.id})`);
+        return { id: item.id, title };
       }
     }
+    console.warn(`⚠️ Proyecto no encontrado: ${name}`);
     return null;
   } catch (error) {
     console.error('Notion find project error:', error.message);
