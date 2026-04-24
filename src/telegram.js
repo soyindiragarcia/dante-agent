@@ -4,6 +4,7 @@ import { processWithClaude, generateEmbedding } from './claude.js';
 import { getClickUpTasks, createClickUpTask } from './clickup.js';
 import { getUpcomingBookings, getAvailability } from './calcom.js';
 import { searchNotion, createNotionPage, updateNotionPage, findProjectByName, findResourceByName, queryDatabase } from './notion.js';
+import { getGoogleCalendarEvents, createGoogleCalendarEvent } from './google-calendar.js';
 
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
 
@@ -88,6 +89,16 @@ export async function handleTelegramMessage(message, supabase) {
       if (toolName === 'save_memory') {
         await saveMemory(supabase, user.id, toolInput.key, toolInput.value);
         return { success: true, message: `Memoria guardada: ${toolInput.key}` };
+      }
+
+      if (toolName === 'get_google_calendar') {
+        const events = await getGoogleCalendarEvents(toolInput.account, toolInput.days || 7);
+        return { events, count: events.length, account: toolInput.account };
+      }
+
+      if (toolName === 'create_google_event') {
+        const event = await createGoogleCalendarEvent(toolInput.account, toolInput);
+        return { success: true, event_id: event.id, url: event.url, title: event.title };
       }
 
       return { error: `Herramienta desconocida: ${toolName}` };

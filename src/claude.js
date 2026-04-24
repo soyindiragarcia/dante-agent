@@ -110,6 +110,41 @@ const TOOLS = [
       required: ['key', 'value'],
     },
   },
+  {
+    name: 'get_google_calendar',
+    description: 'Lee los eventos del Google Calendar de Indira. Tiene 3 cuentas: "clientes" (para reuniones con clientes), "personal" (su calendario personal), "empresa" (Studio Knecta). Úsala cuando pregunte qué tiene en el calendario, sus reuniones, qué tiene esta semana, etc.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account: {
+          type: 'string',
+          description: 'Cuenta a consultar: "clientes", "personal", o "empresa". Si no especifica, consulta "personal".',
+        },
+        days: { type: 'number', description: 'Cuántos días hacia adelante revisar (default 7)' },
+      },
+      required: ['account'],
+    },
+  },
+  {
+    name: 'create_google_event',
+    description: 'Crea un evento en el Google Calendar de Indira. Úsala cuando quiera agendar una reunión, llamada, cita, o cualquier evento en su calendario.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account: {
+          type: 'string',
+          description: 'En qué cuenta crear: "clientes", "personal", o "empresa".',
+        },
+        title: { type: 'string', description: 'Título del evento' },
+        description: { type: 'string', description: 'Descripción o notas del evento (opcional)' },
+        start_datetime: { type: 'string', description: 'Fecha y hora de inicio en formato ISO. Ej: 2026-04-25T10:00:00' },
+        end_datetime: { type: 'string', description: 'Fecha y hora de fin en formato ISO. Ej: 2026-04-25T11:00:00' },
+        attendees: { type: 'string', description: 'Emails de asistentes separados por coma (opcional). Ej: juan@email.com, maria@email.com' },
+        location: { type: 'string', description: 'Lugar o link del evento (opcional)' },
+      },
+      required: ['account', 'title', 'start_datetime', 'end_datetime'],
+    },
+  },
 ];
 
 export async function processWithClaude(userMessage, memories = [], onToolCall = null) {
@@ -122,11 +157,16 @@ export async function processWithClaude(userMessage, memories = [], onToolCall =
 CAPACIDADES REALES:
 - Ver las tareas reales de ClickUp de Indira (se pasan en el mensaje si hay)
 - Crear tareas en ClickUp usando la herramienta create_task
+- Ver y crear eventos en Google Calendar (3 cuentas: clientes, personal, empresa)
+- Ver agenda y disponibilidad en Cal.com
+- Buscar, crear y editar páginas en Notion
 - Guardar información importante usando save_memory
 - Recordar contexto de conversaciones anteriores
 
 CUÁNDO USAR HERRAMIENTAS:
 - create_task: cuando el usuario quiera crear una tarea en ClickUp
+- get_google_calendar: cuando pregunte por su agenda, reuniones, qué tiene esta semana, qué tiene hoy, etc. Si no especifica cuenta, usa "personal". Puedes llamarla 3 veces para ver las 3 cuentas.
+- create_google_event: cuando quiera agendar algo en Google Calendar
 - search_notion: cuando el usuario pregunte algo que puede estar en Notion, o antes de editar
 - update_notion_page: después de search_notion, para editar la página encontrada
 - create_notion_page: cuando el usuario quiera crear algo nuevo en Notion
