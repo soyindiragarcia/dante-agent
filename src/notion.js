@@ -31,22 +31,34 @@ export async function searchNotion(query) {
   }
 }
 
-export async function createNotionPage(title, content, parentPageId = null) {
+export async function createNotionPage(title, content, due_date = null, priority = null) {
   try {
-    const parent = parentPageId
-      ? { type: 'page_id', page_id: parentPageId }
-      : { type: 'page_id', page_id: process.env.NOTION_ROOT_PAGE_ID };
+    const properties = {
+      Nombre: {
+        title: [{ type: 'text', text: { content: title } }],
+      },
+      Descripción: {
+        rich_text: [{ type: 'text', text: { content: content.slice(0, 2000) } }],
+      },
+      Estatus: {
+        status: { name: 'Inbox' },
+      },
+    };
+
+    if (due_date) {
+      properties.Fecha = { date: { start: due_date } };
+    }
+
+    if (priority) {
+      properties.Prioridad = { select: { name: priority } };
+    }
 
     const response = await notionClient.post('/pages', {
-      parent,
-      properties: {
-        title: {
-          title: [{ type: 'text', text: { content: title } }],
-        },
-      },
-      children: contentToBlocks(content),
+      parent: { type: 'database_id', database_id: process.env.NOTION_INBOX_DB_ID },
+      properties,
     });
 
+    console.log(`✅ Entrada creada en Notion: ${title}`);
     return {
       id: response.data.id,
       url: response.data.url,
@@ -54,7 +66,7 @@ export async function createNotionPage(title, content, parentPageId = null) {
     };
   } catch (error) {
     console.error('Notion create error:', error.response?.data || error.message);
-    throw new Error(`No pude crear la página en Notion: ${JSON.stringify(error.response?.data || error.message)}`);
+    throw new Error(`No pude crear en Notion: ${JSON.stringify(error.response?.data || error.message)}`);
   }
 }
 

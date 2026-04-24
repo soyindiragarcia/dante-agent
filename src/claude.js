@@ -35,9 +35,10 @@ const TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        title: { type: 'string', description: 'Título de la página' },
-        content: { type: 'string', description: 'Contenido de la página en texto plano' },
-        parent_page_id: { type: 'string', description: 'ID de la página padre (opcional)' },
+        title: { type: 'string', description: 'Título de la entrada' },
+        content: { type: 'string', description: 'Descripción o contenido detallado' },
+        due_date: { type: 'string', description: 'Fecha en formato YYYY-MM-DD (opcional)' },
+        priority: { type: 'string', description: 'Prioridad: Alta, Media, o Baja (opcional)' },
       },
       required: ['title', 'content'],
     },
