@@ -2,6 +2,7 @@ import axios from 'axios';
 import { getOrCreateUser, saveConversation, searchMemories, saveMemory } from './supabase.js';
 import { processWithClaude, generateEmbedding } from './claude.js';
 import { getClickUpTasks, createClickUpTask } from './clickup.js';
+import { getUpcomingBookings, getAvailability } from './calcom.js';
 import { searchNotion, createNotionPage, updateNotionPage, findProjectByName, findResourceByName, queryDatabase } from './notion.js';
 
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
@@ -33,6 +34,16 @@ export async function handleTelegramMessage(message, supabase) {
       if (toolName === 'create_task') {
         const task = await createClickUpTask(toolInput);
         return { success: true, task_id: task.id, task_name: task.name, url: task.url };
+      }
+
+      if (toolName === 'get_calendar_bookings') {
+        const bookings = await getUpcomingBookings(toolInput.days || 7);
+        return { bookings, count: bookings.length };
+      }
+
+      if (toolName === 'get_calendar_availability') {
+        const availability = await getAvailability(toolInput.days || 7);
+        return { availability };
       }
 
       if (toolName === 'query_notion_database') {

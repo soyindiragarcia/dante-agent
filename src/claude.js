@@ -44,6 +44,28 @@ const TOOLS = [
     },
   },
   {
+    name: 'get_calendar_bookings',
+    description: 'Muestra las reuniones próximas de Indira en Cal.com. Úsala cuando pregunte por su agenda, reuniones, o qué tiene programado.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        days: { type: 'number', description: 'Cuántos días hacia adelante revisar (default 7)' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_calendar_availability',
+    description: 'Muestra la disponibilidad de Indira en Cal.com para agendar reuniones.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        days: { type: 'number', description: 'Cuántos días revisar (default 7)' },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'query_notion_database',
     description: 'Consulta una base de datos específica de Notion de Indira. Úsala para ver el contenido de Proyectos, Recursos, Temas, Áreas o Clientes.',
     input_schema: {
