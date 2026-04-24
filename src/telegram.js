@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { transcribeVoiceMessage } from './voice.js';
 import { getOrCreateUser, saveConversation, searchMemories, saveMemory } from './supabase.js';
 import { processWithClaude, generateEmbedding } from './claude.js';
 import { getClickUpTasks, createClickUpTask } from './clickup.js';
@@ -11,17 +12,33 @@ import { getEmails, readEmail, sendEmail } from './gmail.js';
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
 
 export async function handleTelegramMessage(message, supabase) {
-  const { chat, from, text } = message;
+  const { chat, from, text, voice } = message;
 
-  console.log(`📩 ${from.first_name}: ${text}`);
+  let messageText = text;
+
+  // Manejar notas de voz
+  if (voice && !text) {
+    try {
+      await sendMessage(chat.id, '🎤 _Transcribiendo nota de voz..._');
+      messageText = await transcribeVoiceMessage(voice.file_id);
+    } catch (error) {
+      console.error('Voice transcription error:', error.message);
+      await sendMessage(chat.id, '❌ No pude transcribir la nota de voz.');
+      return;
+    }
+  }
+
+  if (!messageText) return;
+
+  console.log(`📩 ${from.first_name}: ${messageText}`);
 
   try {
     const user = await getOrCreateUser(supabase, from.id, from.first_name, from.username);
 
-    const userEmbedding = generateEmbedding(text);
-    await saveConversation(supabase, user.id, 'user', text, userEmbedding);
+    const userEmbedding = generateEmbedding(messageText);
+    await saveConversation(supabase, user.id, 'user', messageText, userEmbedding);
 
-    const memories = await searchMemories(supabase, user.id, text, userEmbedding, 3);
+    const memories = await searchMemories(supabase, user.id, messageText, userEmbedding, 3);
 
     const [clickupTasks, googleAccounts] = await Promise.all([
       getClickUpTasks(),
@@ -36,7 +53,7 @@ export async function handleTelegramMessage(message, supabase) {
       ? `\n\nCuentas de Google autorizadas (usa EXACTAMENTE estos nombres):\n${googleAccounts.map(a => `- "${a.name}" → ${a.email}`).join('\n')}`
       : '';
 
-    const fullMessage = text + tasksContext + accountsContext;
+    const fullMessage = messageText + tasksContext + accountsContext;
 
     // Manejador de tool calls
     const handleToolCall = async (toolName, toolInput) => {
