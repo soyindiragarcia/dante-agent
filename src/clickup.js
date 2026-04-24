@@ -9,17 +9,20 @@ const clickupClient = axios.create({
 
 export async function getClickUpTasks(teamId = process.env.CLICKUP_TEAM_ID) {
   try {
-    const response = await clickupClient.get(`/team/${teamId}/task`, {
-      params: {
-        'statuses[]': ['open', 'in progress'],
-        archived: false,
-        assignees: [process.env.CLICKUP_USER_ID],
-      },
-    });
+    const params = {
+      archived: false,
+    };
+
+    if (process.env.CLICKUP_USER_ID) {
+      params['assignees[]'] = process.env.CLICKUP_USER_ID;
+    }
+
+    const response = await clickupClient.get(`/team/${teamId}/task`, { params });
     const tasks = response.data.tasks || [];
+    console.log(`📋 ClickUp: ${tasks.length} tareas encontradas`);
     return tasks;
   } catch (error) {
-    console.error('ClickUp error:', error.message);
+    console.error('ClickUp error:', error.response?.data || error.message);
     return [];
   }
 }
