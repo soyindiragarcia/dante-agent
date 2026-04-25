@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { transcribeVoiceMessage } from './voice.js';
+import { analyzeImageWithGemini } from './gemini.js';
 import { getOrCreateUser, saveConversation, searchMemories, saveMemory } from './supabase.js';
 import { processWithClaude, generateEmbedding } from './claude.js';
 import { getClickUpTasks, createClickUpTask } from './clickup.js';
@@ -43,17 +44,27 @@ export async function handleTelegramMessage(message, supabase) {
     }
   }
 
-  // Manejar imágenes
+  // Manejar imágenes con Gemini Flash (gratis)
   if (photo) {
     try {
-      await sendMessage(chat.id, '🖼️ _Procesando imagen..._');
+      await sendMessage(chat.id, '🖼️ _Analizando imagen..._');
       const highRes = photo[photo.length - 1];
-      imageData = await downloadTelegramImage(highRes.file_id);
-      messageText = caption || 'Analiza esta imagen. Descríbela detalladamente y pregúntame si quiero que la guarde en memoria.';
+      const imgData = await downloadTelegramImage(highRes.file_id);
+      const description = await analyzeImageWithGemini(imgData.base64, imgData.mediaType, caption || null);
+      // Pasar descripción a Claude como texto — sin gastar tokens de visión
+      messageText = `[IMAGEN ANALIZADA POR GEMINI]\n${description}\n\n${caption ? `Instrucción del usuario: ${caption}` : 'El usuario envió esta imagen. Responde sobre ella y pregunta si quiere guardarla en memoria.'}`;
+      imageData = null; // Gemini ya la procesó, no hace falta enviar a Claude
     } catch (error) {
-      console.error('Image download error:', error.message);
-      await sendMessage(chat.id, '❌ No pude procesar la imagen.');
-      return;
+      console.error('Image analysis error:', error.message);
+      // Fallback: enviar a Claude Vision si Gemini falla
+      try {
+        const highRes = photo[photo.length - 1];
+        imageData = await downloadTelegramImage(highRes.file_id);
+        messageText = caption || 'Analiza esta imagen detalladamente.';
+      } catch (e) {
+        await sendMessage(chat.id, '❌ No pude procesar la imagen.');
+        return;
+      }
     }
   }
 

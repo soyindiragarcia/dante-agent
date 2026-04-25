@@ -338,6 +338,30 @@ const TOOLS_CACHED = TOOLS.map((tool, i) =>
   i === TOOLS.length - 1 ? { ...tool, cache_control: { type: 'ephemeral' } } : tool
 );
 
+// Routing: elige el modelo según la complejidad de la tarea
+const WRITING_KEYWORDS = [
+  'escribe', 'redacta', 'borrador', 'propuesta', 'plantilla',
+  'crea un correo', 'draft', 'carta', 'contrato', 'guion',
+  'analiza en detalle', 'estrategia', 'plan completo', 'informe',
+  'presentación', 'resumen ejecutivo', 'reporte',
+];
+
+function selectModel(message, hasImage = null) {
+  // Si la imagen llegó a Claude (fallback de Gemini) → Sonnet para mejor visión
+  if (hasImage) return 'claude-sonnet-4-5';
+
+  const lower = (message || '').toLowerCase();
+  const needsWriting = WRITING_KEYWORDS.some(kw => lower.includes(kw));
+
+  if (needsWriting) {
+    console.log('✍️ Tarea de escritura compleja → claude-sonnet-4-5');
+    return 'claude-sonnet-4-5';
+  }
+
+  console.log('⚡ Tarea estándar → claude-haiku-4-5');
+  return process.env.CLAUDE_MODEL || 'claude-haiku-4-5';
+}
+
 export async function processWithClaude(userMessage, memories = [], onToolCall = null, imageData = null) {
   const today = new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const memoryContext = memories.length > 0
@@ -366,7 +390,7 @@ export async function processWithClaude(userMessage, memories = [], onToolCall =
     { type: 'text', text: dynamicSystem },
   ];
 
-  const MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-4-5';
+  const MODEL = selectModel(userMessage, imageData);
 
   try {
     let response = await client.messages.create({
