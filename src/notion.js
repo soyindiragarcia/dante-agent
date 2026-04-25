@@ -236,13 +236,16 @@ export async function addToShoppingList(item, quantity = null, category = null) 
       return await addItemToShoppingPage(pageId, itemText, category);
     }
 
-    // Fallback: base de datos o inbox
+    // Base de datos de compras (Actividades Kanban) o inbox como fallback
     const dbId = process.env.NOTION_SHOPPING_DB_ID || process.env.NOTION_INBOX_DB_ID;
-    const title = `🛒 ${category ? `[${category}] ` : ''}${itemText}`;
+    const title = `${category ? `[${category}] ` : ''}${itemText}`;
     const properties = {
       Nombre: { title: [{ type: 'text', text: { content: title } }] },
     };
-    if (!process.env.NOTION_SHOPPING_DB_ID) {
+    if (process.env.NOTION_SHOPPING_DB_ID) {
+      // DB de compras: usa columna Estado con valor "Sin empezar"
+      properties.Estado = { status: { name: 'Sin empezar' } };
+    } else {
       properties.Estatus = { status: { name: 'Inbox' } };
     }
     const response = await notionClient.post('/pages', {
@@ -295,9 +298,21 @@ export async function getShoppingList() {
       return items;
     }
 
-    // Fallback: base de datos
+    // Base de datos de compras o inbox
     const dbId = process.env.NOTION_SHOPPING_DB_ID || process.env.NOTION_INBOX_DB_ID;
-    const response = await notionClient.post(`/databases/${dbId}/query`, { page_size: 100 });
+
+    // Si es la DB de compras, filtrar solo los pendientes (no "Listo")
+    const queryBody = process.env.NOTION_SHOPPING_DB_ID
+      ? {
+          page_size: 100,
+          filter: {
+            property: 'Estado',
+            status: { does_not_equal: 'Listo' },
+          },
+        }
+      : { page_size: 100 };
+
+    const response = await notionClient.post(`/databases/${dbId}/query`, queryBody);
     return (response.data.results || [])
       .filter(item => !item.archived)
       .filter(item => {
@@ -307,7 +322,13 @@ export async function getShoppingList() {
       })
       .map(item => {
         const titleProp = Object.values(item.properties).find(v => v.type === 'title');
-        return { id: item.id, item: (titleProp?.title?.[0]?.plain_text || '').replace(/^🛒\s*/, ''), url: item.url };
+        const statusProp = item.properties?.Estado;
+        return {
+          id: item.id,
+          item: titleProp?.title?.[0]?.plain_text || 'sin título',
+          status: statusProp?.status?.name || 'Sin empezar',
+          url: item.url,
+        };
       });
 
   } catch (error) {
