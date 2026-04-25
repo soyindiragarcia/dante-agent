@@ -22,6 +22,15 @@ import { getEmails, readEmail, sendEmail, countEmails, trashEmailsBulk, listTopS
 
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
 
+// Horario laboral de Indira: Lunes-Viernes 9am-5pm Venezuela (UTC-4)
+// Fuera de este horario DANTE no menciona trabajo ni ClickUp
+function isWorkHours() {
+  const nowVE = new Date(Date.now() - 4 * 60 * 60 * 1000);
+  const day = nowVE.getUTCDay();   // 0=Dom, 1=Lun ... 5=Vie, 6=Sáb
+  const hour = nowVE.getUTCHours(); // 0-23 en VE
+  return day >= 1 && day <= 5 && hour >= 9 && hour < 17;
+}
+
 async function downloadTelegramImage(fileId) {
   const fileInfo = await axios.get(`${TELEGRAM_API_URL}/getFile`, { params: { file_id: fileId } });
   const filePath = fileInfo.data.result.file_path;
@@ -90,12 +99,13 @@ export async function handleTelegramMessage(message, supabase) {
 
     const memories = await searchMemories(supabase, user.id, messageText, userEmbedding, 3);
 
+    const workTime = isWorkHours();
     const [clickupTasks, googleAccounts] = await Promise.all([
-      getClickUpTasks(),
+      workTime ? getClickUpTasks() : Promise.resolve([]),
       listGoogleAccounts(),
     ]);
 
-    const tasksContext = clickupTasks.length > 0
+    const tasksContext = workTime && clickupTasks.length > 0
       ? `\n\nTareas pendientes en ClickUp:\n${clickupTasks.slice(0, 5).map(t => `- ${t.name} [${t.status?.status || 'open'}]`).join('\n')}`
       : '';
 
