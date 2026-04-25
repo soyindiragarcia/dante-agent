@@ -65,6 +65,19 @@ export async function getAuthClient(accountName) {
   return oauth2Client;
 }
 
+// Traduce errores de Google API a mensajes útiles para el LLM
+export function friendlyGoogleError(accountName, err) {
+  const msg = err.message || '';
+  if (msg.includes('has not been used') || msg.includes('is disabled')) {
+    const api = msg.includes('gmail') ? 'Gmail' : msg.includes('drive') ? 'Drive' : 'Google';
+    return `La API de ${api} no está activada en Google Cloud. Pídele a Indira que la active en console.developers.google.com`;
+  }
+  if (msg.includes('invalid_grant') || msg.includes('Token has been expired') || msg.includes('token has been expired')) {
+    return `El token de la cuenta "${accountName}" expiró o fue revocado. Necesitas reautorizar en: https://dante-agent-production.up.railway.app/auth/google?account=${accountName}`;
+  }
+  return msg;
+}
+
 // Genera URL de autorización
 export function getAuthUrl(account) {
   const oauth2Client = createOAuthClient();

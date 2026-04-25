@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { getAuthClient } from './google-calendar.js';
+import { getAuthClient, friendlyGoogleError } from './google-calendar.js';
 
 // Busca archivos en Google Drive
 export async function searchDrive(accountName, query, maxResults = 10) {
@@ -26,7 +26,7 @@ export async function searchDrive(accountName, query, maxResults = 10) {
     }));
   } catch (error) {
     console.error(`Google Drive search error (${accountName}):`, error.message);
-    return { error: error.message };
+    return { error: friendlyGoogleError(accountName, error) };
   }
 }
 
@@ -63,7 +63,7 @@ export async function readDriveFile(accountName, fileId) {
     return { name, url: meta.data.webViewLink, content };
   } catch (error) {
     console.error(`Google Drive read error (${accountName}):`, error.message);
-    return { error: error.message };
+    return { error: friendlyGoogleError(accountName, error) };
   }
 }
 
@@ -133,7 +133,7 @@ export async function deleteDriveFile(accountName, fileId) {
     return { success: true, message: `"${fileName}" movido a la papelera.` };
   } catch (error) {
     console.error(`Drive delete error (${accountName}):`, error.message);
-    return { error: error.message };
+    return { error: friendlyGoogleError(accountName, error) };
   }
 }
 
@@ -167,7 +167,7 @@ export async function listDriveFiles(accountName, folderId = 'root', maxResults 
     }));
   } catch (error) {
     console.error(`Drive list error (${accountName}):`, error.message);
-    return { error: error.message };
+    return { error: friendlyGoogleError(accountName, error) };
   }
 }
 

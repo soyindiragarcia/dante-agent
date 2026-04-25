@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { getAuthClient } from './google-calendar.js';
+import { getAuthClient, friendlyGoogleError } from './google-calendar.js';
 
 // Lee los últimos emails de una cuenta
 export async function getEmails(accountName, maxResults = 10, query = '') {
@@ -43,7 +43,7 @@ export async function getEmails(accountName, maxResults = 10, query = '') {
     });
   } catch (error) {
     console.error(`Gmail error (${accountName}):`, error.message);
-    return { error: error.message };
+    return { error: friendlyGoogleError(accountName, error) };
   }
 }
 
@@ -74,7 +74,7 @@ export async function readEmail(accountName, messageId) {
     };
   } catch (error) {
     console.error(`Gmail read error (${accountName}):`, error.message);
-    return { error: error.message };
+    return { error: friendlyGoogleError(accountName, error) };
   }
 }
 
@@ -142,7 +142,7 @@ export async function countEmails(accountName, query) {
     return { count: total, query, account: accountName };
   } catch (error) {
     console.error(`Gmail count error (${accountName}):`, error.message);
-    return { error: error.message };
+    return { error: friendlyGoogleError(accountName, error) };
   }
 }
 
@@ -177,7 +177,7 @@ export async function trashEmailsBulk(accountName, query, maxToTrash = 500) {
     };
   } catch (error) {
     console.error(`Gmail bulk delete error (${accountName}):`, error.message);
-    return { error: error.message };
+    return { error: friendlyGoogleError(accountName, error) };
   }
 }
 
@@ -225,7 +225,7 @@ export async function listTopSenders(accountName, maxResults = 20) {
     return sorted;
   } catch (error) {
     console.error(`Gmail top senders error (${accountName}):`, error.message);
-    return { error: error.message };
+    return { error: friendlyGoogleError(accountName, error) };
   }
 }
 
