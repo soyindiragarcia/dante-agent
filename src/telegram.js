@@ -6,9 +6,17 @@ import { processWithClaude, generateEmbedding, needsClaudeModel } from './claude
 import { processWithGroq } from './groq-llm.js';
 import { getClickUpTasks, createClickUpTask } from './clickup.js';
 import { getUpcomingBookings, getAvailability } from './calcom.js';
-import { searchNotion, createNotionPage, updateNotionPage, findProjectByName, findResourceByName, queryDatabase } from './notion.js';
+import { searchNotion, createNotionPage, updateNotionPage, findProjectByName, findResourceByName, queryDatabase, addToShoppingList, getShoppingList } from './notion.js';
 import { getGoogleCalendarEvents, createGoogleCalendarEvent, listGoogleAccounts, getAllCalendarEvents } from './google-calendar.js';
-import { saveReminder } from './reminders.js';
+import {
+  saveReminder,
+  saveRecurringReminder,
+  listRecurringReminders,
+  deleteRecurringReminder,
+  logPeriodStart,
+  logPeriodEnd,
+  getPeriodPrediction,
+} from './reminders.js';
 import { searchDrive, readDriveFile, createDriveDoc, deleteDriveFile, listDriveFiles } from './google-drive.js';
 import { getEmails, readEmail, sendEmail, countEmails, trashEmailsBulk, listTopSenders } from './gmail.js';
 
@@ -233,6 +241,66 @@ export async function handleTelegramMessage(message, supabase) {
       if (toolName === 'set_reminder') {
         const reminder = await saveReminder(chat.id, toolInput.message, toolInput.datetime);
         return { success: true, message: toolInput.message, scheduled_at: toolInput.datetime };
+      }
+
+      // ── Recordatorios recurrentes ──────────────────────────
+      if (toolName === 'set_recurring_reminder') {
+        const reminder = await saveRecurringReminder(
+          chat.id,
+          toolInput.message,
+          toolInput.frequency,
+          toolInput.time_ve,
+          toolInput.days_of_week || null,
+          toolInput.day_of_month || null
+        );
+        return {
+          success: true,
+          id: reminder.id,
+          message: toolInput.message,
+          frequency: toolInput.frequency,
+          time_ve: toolInput.time_ve,
+        };
+      }
+
+      if (toolName === 'list_recurring_reminders') {
+        const reminders = await listRecurringReminders(chat.id);
+        return { reminders, count: reminders.length };
+      }
+
+      if (toolName === 'delete_recurring_reminder') {
+        await deleteRecurringReminder(toolInput.reminder_id);
+        return { success: true };
+      }
+
+      // ── Ciclo menstrual ────────────────────────────────────
+      if (toolName === 'log_period') {
+        if (toolInput.action === 'start') {
+          const log = await logPeriodStart(chat.id, toolInput.date, toolInput.notes || null);
+          return { success: true, action: 'start', ...log };
+        } else {
+          const log = await logPeriodEnd(chat.id, toolInput.date);
+          return { success: true, action: 'end', ...log };
+        }
+      }
+
+      if (toolName === 'get_period_prediction') {
+        const prediction = await getPeriodPrediction(chat.id);
+        return prediction;
+      }
+
+      // ── Lista de compras ───────────────────────────────────
+      if (toolName === 'add_to_shopping_list') {
+        const result = await addToShoppingList(
+          toolInput.item,
+          toolInput.quantity || null,
+          toolInput.category || null
+        );
+        return { success: true, ...result };
+      }
+
+      if (toolName === 'get_shopping_list') {
+        const items = await getShoppingList();
+        return { items, count: items.length };
       }
 
       return { error: `Herramienta desconocida: ${toolName}` };

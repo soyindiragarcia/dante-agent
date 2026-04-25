@@ -4,7 +4,7 @@ import cron from 'node-cron';
 import { handleTelegramMessage } from './src/telegram.js';
 import { initSupabase } from './src/supabase.js';
 import { getAuthUrl, handleGoogleCallback, saveGoogleAccount, listGoogleAccounts } from './src/google-calendar.js';
-import { checkAndSendReminders } from './src/reminders.js';
+import { checkAndSendReminders, checkAndSendRecurringReminders } from './src/reminders.js';
 
 dotenv.config();
 
@@ -113,10 +113,11 @@ app.post(`/webhook/telegram`, async (req, res) => {
   }
 });
 
-// Cron job: revisa recordatorios cada minuto
+// Cron job: revisa recordatorios cada minuto (puntuales + recurrentes)
 cron.schedule('* * * * *', async () => {
   try {
     await checkAndSendReminders();
+    await checkAndSendRecurringReminders();
   } catch (err) {
     console.error('Reminders cron error:', err.message);
   }

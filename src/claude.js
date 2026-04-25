@@ -298,10 +298,95 @@ export const TOOLS = [
       required: ['account', 'file_id'],
     },
   },
+
+  // ── Recordatorios recurrentes ──────────────────────────────
+  {
+    name: 'set_recurring_reminder',
+    description: 'Crea un recordatorio recurrente: diario, semanal o mensual. Úsala para medicamentos, rutina de skincare, vitaminas, ejercicio, o cualquier hábito repetitivo. La hora siempre en Venezuela (UTC-4).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', description: 'Texto del recordatorio. Sé descriptivo. Ej: "Tomar Ibuprofeno 400mg con comida", "Aplicar crema humectante y SPF"' },
+        frequency: { type: 'string', enum: ['daily', 'weekly', 'monthly'], description: 'Frecuencia: daily=todos los días, weekly=días específicos de la semana, monthly=una vez al mes en un día fijo' },
+        time_ve: { type: 'string', description: 'Hora en Venezuela en formato HH:MM. Ej: "08:00", "21:30"' },
+        days_of_week: { type: 'array', items: { type: 'number' }, description: 'Solo para frequency=weekly. Días de la semana: 0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb. Ej: [1,2,3,4,5] para lunes a viernes' },
+        day_of_month: { type: 'number', description: 'Solo para frequency=monthly. Día del mes 1-31. Ej: 1 para el primer día de cada mes' },
+      },
+      required: ['message', 'frequency', 'time_ve'],
+    },
+  },
+  {
+    name: 'list_recurring_reminders',
+    description: 'Muestra todos los recordatorios recurrentes activos de Indira (medicamentos, rutinas, etc.). Úsala cuando pregunte qué recordatorios tiene configurados.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'delete_recurring_reminder',
+    description: 'Desactiva un recordatorio recurrente. Primero usa list_recurring_reminders para obtener el ID.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        reminder_id: { type: 'string', description: 'ID del recordatorio a desactivar (UUID obtenido de list_recurring_reminders)' },
+      },
+      required: ['reminder_id'],
+    },
+  },
+
+  // ── Ciclo menstrual ────────────────────────────────────────
+  {
+    name: 'log_period',
+    description: 'Registra el inicio o fin del período menstrual de Indira. Úsala cuando diga "me llegó el período", "empezó", "se me fue", "terminó". Si no da fecha, usa hoy.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['start', 'end'], description: 'start = llegó el período / end = terminó el período' },
+        date: { type: 'string', description: 'Fecha en formato YYYY-MM-DD. Si no la menciona, usa la fecha de hoy.' },
+        notes: { type: 'string', description: 'Síntomas o notas: dolor, flujo abundante, cólicos, etc. (opcional)' },
+      },
+      required: ['action', 'date'],
+    },
+  },
+  {
+    name: 'get_period_prediction',
+    description: 'Muestra el historial del ciclo menstrual de Indira y predice cuándo llegará el próximo período. También indica si debería comprar analgésicos pronto.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+
+  // ── Lista de compras en Notion ─────────────────────────────
+  {
+    name: 'add_to_shopping_list',
+    description: 'Agrega un artículo a la lista de compras de Indira en Notion. Úsala SIEMPRE que diga que necesita comprar algo, que se le acabó algo, o que tiene que conseguir algo — medicamentos, skincare, comida, hogar, etc.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        item: { type: 'string', description: 'Nombre del artículo. Ej: "Ibuprofeno 400mg", "Crema SPF 50", "Proteína de suero"' },
+        quantity: { type: 'string', description: 'Cantidad o especificaciones adicionales. Ej: "2 cajas", "250ml", "talla M" (opcional)' },
+        category: { type: 'string', description: 'Categoría: Medicamentos, Skincare, Comida, Hogar, Personal, Otros (opcional)' },
+      },
+      required: ['item'],
+    },
+  },
+  {
+    name: 'get_shopping_list',
+    description: 'Muestra la lista de compras pendientes de Indira guardada en Notion.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
 ];
 
 // Parte estática del system prompt — se cachea entre requests (también exportado para Groq)
-export const STATIC_SYSTEM = `Eres DANTE, asistente de IA personal de Indira García.
+export const STATIC_SYSTEM = `Eres DANTE, asistente de IA personal de Indira García (venezolana, Studio Knecta).
 
 CAPACIDADES REALES:
 - Ver las tareas reales de ClickUp de Indira (se pasan en el mensaje si hay)
@@ -309,42 +394,46 @@ CAPACIDADES REALES:
 - Ver y crear eventos en Google Calendar (5 cuentas de Google)
 - Ver, analizar y describir imágenes que te envíen por Telegram (visión nativa)
 - Ver agenda y disponibilidad en Cal.com
-- Buscar, crear y editar páginas en Notion
+- Buscar, crear y editar páginas en Notion (sistema PARA: Proyectos, Recursos, Temas, Áreas, Clientes, Inbox)
 - Guardar información importante usando save_memory
 - Recordar contexto de conversaciones anteriores
 - Leer y enviar emails de Gmail, limpiar correos en masa
 - Buscar, leer, crear y eliminar archivos en Google Drive
+- Recordatorios puntuales (set_reminder) y recurrentes (set_recurring_reminder) — medicamentos, rutinas, hábitos
+- Registro del ciclo menstrual con predicción del próximo período
+- Lista de compras en Notion — cualquier cosa que mencione necesitar comprar
 
 CUÁNDO USAR HERRAMIENTAS:
-- create_task: cuando el usuario quiera crear una tarea en ClickUp
-- get_all_calendars: USA ESTA SIEMPRE que haya cualquier pregunta sobre calendario, agenda, reuniones, eventos, qué tiene hoy/mañana/esta semana/el martes. NUNCA asumas que no hay eventos sin haber llamado esta herramienta primero. Es OBLIGATORIO llamarla antes de responder cualquier cosa sobre agenda.
-- get_google_calendar: SOLO si la usuaria menciona explícitamente una cuenta específica Y ya llamaste get_all_calendars.
-- create_google_event: cuando quiera agendar algo en Google Calendar
-- search_drive: cuando pregunte por archivos, documentos, presentaciones en su Drive
-- read_drive_file: después de search_drive, para leer el contenido de un archivo específico
-- create_drive_doc: cuando quiera crear un documento en Drive
-- list_drive_files: para ver el contenido de un Drive antes de limpiar
-- delete_drive_file: para mover un archivo a la papelera del Drive
-- get_emails: cuando pregunte por sus correos o emails recibidos
-- read_email: para leer el contenido completo de un email específico
-- send_email: cuando quiera enviar o responder un correo
-- count_emails: SIEMPRE antes de borrar emails en masa — muestra cuántos hay
-- trash_emails_bulk: elimina emails en masa. OBLIGATORIO llamar count_emails primero y confirmar con el usuario
-- list_top_senders: cuando quiera saber qué está llenando su correo
-- search_notion: cuando el usuario pregunte algo que puede estar en Notion, o antes de editar
-- update_notion_page: después de search_notion, para editar la página encontrada
-- create_notion_page: cuando el usuario quiera crear algo nuevo en Notion
-- save_memory: cuando el usuario diga "recuerda que..." o comparta info personal importante
-- set_reminder: cuando diga "recuérdame", "avísame a las X", "mándame un mensaje mañana a las Y". La hora siempre es en Venezuela (UTC-4). Confirma la hora exacta al usuario.
+- create_task: cuando quiera crear una tarea en ClickUp
+- get_all_calendars: USA ESTA SIEMPRE para cualquier pregunta sobre agenda, reuniones, eventos, qué tiene hoy/mañana/esta semana. OBLIGATORIO antes de responder sobre agenda.
+- get_google_calendar: SOLO si menciona una cuenta específica Y ya llamaste get_all_calendars
+- create_google_event: cuando quiera agendar algo
+- search_drive / read_drive_file / create_drive_doc / list_drive_files / delete_drive_file: para archivos en Drive
+- get_emails / read_email / send_email: para correos de Gmail
+- count_emails: SIEMPRE antes de borrar correos en masa
+- trash_emails_bulk: eliminar en masa. OBLIGATORIO llamar count_emails primero y confirmar
+- list_top_senders: para analizar qué llena el correo
+- search_notion / update_notion_page / create_notion_page / query_notion_database: para contenido en Notion
+- save_memory: cuando diga "recuerda que..." o comparta info personal importante
+- set_reminder: recordatorio puntual — "recuérdame el martes a las 3pm". Hora en Venezuela. Confirma al responder.
+- set_recurring_reminder: recordatorio que se repite — medicamentos diarios, rutina de skincare, vitaminas. Confirma hora y frecuencia.
+- list_recurring_reminders: cuando pregunte qué recordatorios tiene activos
+- delete_recurring_reminder: para desactivar un recordatorio recurrente (obtén el ID con list primero)
+- log_period: cuando diga "me llegó el período", "empezó mi período", "se me fue", "terminó". Si no da fecha usa hoy. DESPUÉS llama get_period_prediction para mostrar la predicción.
+- get_period_prediction: para ver cuándo llega el próximo período, historial de ciclos, y si debe comprar analgésicos
+- add_to_shopping_list: SIEMPRE que mencione necesitar comprar algo — medicamentos, skincare, comida, cualquier producto. Agrégalo a Notion automáticamente sin que ella tenga que pedirlo explícitamente.
+- get_shopping_list: cuando quiera ver qué tiene pendiente por comprar
 
 REGLAS CRÍTICAS:
 - Responde SIEMPRE en español natural y conversacional
 - NUNCA muestres código ni procesos técnicos
 - NUNCA inventes datos — usa solo lo que se te proporciona
-- Si el usuario pide editar algo en Notion: PRIMERO busca con search_notion, LUEGO edita con update_notion_page
-- NO menciones ClickUp si el usuario está hablando de Notion o algo diferente
-- Sé directo y accionable — confirma cuando hagas algo
-- Para limpiar emails: SIEMPRE usa count_emails primero, muestra el número y pide confirmación antes de borrar`;
+- Para editar algo en Notion: PRIMERO busca con search_notion, LUEGO edita con update_notion_page
+- Para limpiar emails: SIEMPRE usa count_emails primero y pide confirmación antes de borrar
+- Para compras: si menciona que necesita algo → llama add_to_shopping_list INMEDIATAMENTE, sin esperar a que lo pida
+- Para período: después de log_period → llama get_period_prediction. Si days_until_next ≤ 7, sugiere add_to_shopping_list para analgésicos (Ibuprofeno 400mg o Naproxeno)
+- Para medicamentos diarios: usa set_recurring_reminder con frequency: 'daily'
+- Sé directo y accionable — confirma siempre lo que hiciste`;
 
 // Tools con cache en el último elemento
 const TOOLS_CACHED = TOOLS.map((tool, i) =>

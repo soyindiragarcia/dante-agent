@@ -170,6 +170,73 @@ export async function findResourceByName(name) {
   }
 }
 
+// ============================================================
+// LISTA DE COMPRAS
+// ============================================================
+
+export async function addToShoppingList(item, quantity = null, category = null) {
+  try {
+    const dbId = process.env.NOTION_SHOPPING_DB_ID || process.env.NOTION_INBOX_DB_ID;
+    const quantityStr = quantity ? ` (${quantity})` : '';
+    const categoryStr = category ? `[${category}] ` : '';
+    const title = `🛒 ${categoryStr}${item}${quantityStr}`;
+
+    const properties = {
+      Nombre: {
+        title: [{ type: 'text', text: { content: title } }],
+      },
+    };
+
+    // Si usa el inbox como fallback, agregar estado Inbox
+    if (!process.env.NOTION_SHOPPING_DB_ID) {
+      properties.Estatus = { status: { name: 'Inbox' } };
+    }
+
+    const response = await notionClient.post('/pages', {
+      parent: { type: 'database_id', database_id: dbId },
+      properties,
+    });
+
+    console.log(`🛒 Agregado a lista de compras: ${title}`);
+    return { id: response.data.id, url: response.data.url, item: title };
+  } catch (error) {
+    console.error('Notion shopping add error:', error.response?.data || error.message);
+    throw new Error(`No pude agregar a la lista de compras: ${JSON.stringify(error.response?.data || error.message)}`);
+  }
+}
+
+export async function getShoppingList() {
+  try {
+    const dbId = process.env.NOTION_SHOPPING_DB_ID || process.env.NOTION_INBOX_DB_ID;
+    const response = await notionClient.post(`/databases/${dbId}/query`, { page_size: 100 });
+    const results = (response.data.results || []).filter(item => !item.archived);
+
+    return results
+      .filter(item => {
+        // Si hay DB dedicada de compras, mostrar todo
+        if (process.env.NOTION_SHOPPING_DB_ID) return true;
+        // Si usa inbox, solo mostrar ítems con prefijo 🛒
+        const titleProp = Object.values(item.properties).find(v => v.type === 'title');
+        const title = titleProp?.title?.[0]?.plain_text || '';
+        return title.startsWith('🛒');
+      })
+      .map(item => {
+        const titleProp = Object.values(item.properties).find(v => v.type === 'title');
+        const rawTitle = titleProp?.title?.[0]?.plain_text || 'sin título';
+        const statusProp = Object.values(item.properties).find(v => v.type === 'status');
+        return {
+          id: item.id,
+          item: rawTitle.replace(/^🛒\s*/, ''),
+          status: statusProp?.status?.name || 'Pendiente',
+          url: item.url,
+        };
+      });
+  } catch (error) {
+    console.error('Notion get shopping list error:', error.message);
+    return [];
+  }
+}
+
 export async function getNotionPage(pageId) {
   try {
     const [page, blocks] = await Promise.all([
