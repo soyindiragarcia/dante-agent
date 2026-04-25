@@ -114,6 +114,63 @@ export async function createDriveDoc(accountName, title, content, folderId = nul
   }
 }
 
+// Mueve un archivo a la papelera (reversible)
+export async function deleteDriveFile(accountName, fileId) {
+  try {
+    const auth = await getAuthClient(accountName);
+    const drive = google.drive({ version: 'v3', auth });
+
+    // Obtener nombre antes de borrar
+    const meta = await drive.files.get({ fileId, fields: 'name' });
+    const fileName = meta.data.name;
+
+    await drive.files.update({
+      fileId,
+      requestBody: { trashed: true },
+    });
+
+    console.log(`🗑️ Drive archivo eliminado (${accountName}): ${fileName}`);
+    return { success: true, message: `"${fileName}" movido a la papelera.` };
+  } catch (error) {
+    console.error(`Drive delete error (${accountName}):`, error.message);
+    return { error: error.message };
+  }
+}
+
+// Lista archivos de una carpeta o raíz con tamaño
+export async function listDriveFiles(accountName, folderId = 'root', maxResults = 20) {
+  try {
+    const auth = await getAuthClient(accountName);
+    const drive = google.drive({ version: 'v3', auth });
+
+    const query = folderId === 'root'
+      ? `'root' in parents and trashed = false`
+      : `'${folderId}' in parents and trashed = false`;
+
+    const response = await drive.files.list({
+      q: query,
+      fields: 'files(id, name, mimeType, size, modifiedTime, webViewLink)',
+      pageSize: maxResults,
+      orderBy: 'modifiedTime desc',
+    });
+
+    const files = response.data.files || [];
+    console.log(`📁 Drive list (${accountName}): ${files.length} archivos`);
+
+    return files.map(f => ({
+      id: f.id,
+      name: f.name,
+      type: mimeTypeToLabel(f.mimeType),
+      size: f.size ? `${(parseInt(f.size) / 1024).toFixed(0)} KB` : '—',
+      modified: f.modifiedTime?.split('T')[0],
+      url: f.webViewLink,
+    }));
+  } catch (error) {
+    console.error(`Drive list error (${accountName}):`, error.message);
+    return { error: error.message };
+  }
+}
+
 function mimeTypeToLabel(mimeType) {
   const map = {
     'application/vnd.google-apps.document': 'Google Doc',

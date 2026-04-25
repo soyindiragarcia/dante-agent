@@ -6,15 +6,30 @@ import { getClickUpTasks, createClickUpTask } from './clickup.js';
 import { getUpcomingBookings, getAvailability } from './calcom.js';
 import { searchNotion, createNotionPage, updateNotionPage, findProjectByName, findResourceByName, queryDatabase } from './notion.js';
 import { getGoogleCalendarEvents, createGoogleCalendarEvent, listGoogleAccounts, getAllCalendarEvents } from './google-calendar.js';
-import { searchDrive, readDriveFile, createDriveDoc } from './google-drive.js';
-import { getEmails, readEmail, sendEmail } from './gmail.js';
+import { searchDrive, readDriveFile, createDriveDoc, deleteDriveFile, listDriveFiles } from './google-drive.js';
+import { getEmails, readEmail, sendEmail, countEmails, trashEmailsBulk, listTopSenders } from './gmail.js';
 
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
 
+async function downloadTelegramImage(fileId) {
+  const fileInfo = await axios.get(`${TELEGRAM_API_URL}/getFile`, { params: { file_id: fileId } });
+  const filePath = fileInfo.data.result.file_path;
+  const ext = filePath.split('.').pop().toLowerCase();
+  const mediaType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+
+  const imageResponse = await axios.get(
+    `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${filePath}`,
+    { responseType: 'arraybuffer' }
+  );
+  const base64 = Buffer.from(imageResponse.data).toString('base64');
+  return { base64, mediaType };
+}
+
 export async function handleTelegramMessage(message, supabase) {
-  const { chat, from, text, voice } = message;
+  const { chat, from, text, voice, photo, caption } = message;
 
   let messageText = text;
+  let imageData = null;
 
   // Manejar notas de voz
   if (voice && !text) {
@@ -24,6 +39,20 @@ export async function handleTelegramMessage(message, supabase) {
     } catch (error) {
       console.error('Voice transcription error:', error.message);
       await sendMessage(chat.id, '❌ No pude transcribir la nota de voz.');
+      return;
+    }
+  }
+
+  // Manejar imágenes
+  if (photo) {
+    try {
+      await sendMessage(chat.id, '🖼️ _Procesando imagen..._');
+      const highRes = photo[photo.length - 1];
+      imageData = await downloadTelegramImage(highRes.file_id);
+      messageText = caption || 'Analiza esta imagen. Descríbela detalladamente y pregúntame si quiero que la guarde en memoria.';
+    } catch (error) {
+      console.error('Image download error:', error.message);
+      await sendMessage(chat.id, '❌ No pude procesar la imagen.');
       return;
     }
   }
@@ -163,10 +192,35 @@ export async function handleTelegramMessage(message, supabase) {
         return result;
       }
 
+      if (toolName === 'count_emails') {
+        const result = await countEmails(toolInput.account, toolInput.query);
+        return result;
+      }
+
+      if (toolName === 'trash_emails_bulk') {
+        const result = await trashEmailsBulk(toolInput.account, toolInput.query, toolInput.max_to_trash || 500);
+        return result;
+      }
+
+      if (toolName === 'list_top_senders') {
+        const senders = await listTopSenders(toolInput.account);
+        return { senders, account: toolInput.account };
+      }
+
+      if (toolName === 'list_drive_files') {
+        const files = await listDriveFiles(toolInput.account, toolInput.folder_id || 'root');
+        return { files, count: Array.isArray(files) ? files.length : 0 };
+      }
+
+      if (toolName === 'delete_drive_file') {
+        const result = await deleteDriveFile(toolInput.account, toolInput.file_id);
+        return result;
+      }
+
       return { error: `Herramienta desconocida: ${toolName}` };
     };
 
-    const response = await processWithClaude(fullMessage, memories, handleToolCall);
+    const response = await processWithClaude(fullMessage, memories, handleToolCall, imageData);
 
     const responseEmbedding = generateEmbedding(response.content);
     await saveConversation(supabase, user.id, 'assistant', response.content, responseEmbedding);

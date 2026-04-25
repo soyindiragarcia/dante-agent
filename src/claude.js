@@ -226,9 +226,69 @@ const TOOLS = [
       required: ['account', 'to', 'subject', 'body'],
     },
   },
+  {
+    name: 'count_emails',
+    description: 'Cuenta cuántos emails hay en una cuenta de Gmail con un filtro dado. Úsala ANTES de borrar para mostrar cuántos hay y pedir confirmación.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account: { type: 'string', description: 'Nombre de la cuenta' },
+        query: { type: 'string', description: 'Filtro Gmail. Ej: "from:facebookmail.com", "category:social", "from:twitter.com OR from:instagram.com"' },
+      },
+      required: ['account', 'query'],
+    },
+  },
+  {
+    name: 'trash_emails_bulk',
+    description: 'Elimina permanentemente emails en masa que coincidan con un filtro. IMPORTANTE: Siempre llama count_emails primero y confirma con el usuario antes de usar esta herramienta.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account: { type: 'string', description: 'Nombre de la cuenta' },
+        query: { type: 'string', description: 'Filtro Gmail para los emails a eliminar' },
+        max_to_trash: { type: 'number', description: 'Máximo de emails a eliminar por llamada (default 500)' },
+      },
+      required: ['account', 'query'],
+    },
+  },
+  {
+    name: 'list_top_senders',
+    description: 'Muestra los remitentes con más correos en el inbox. Úsala cuando quiera saber qué está llenando su correo o decidir qué limpiar.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account: { type: 'string', description: 'Nombre de la cuenta a analizar' },
+      },
+      required: ['account'],
+    },
+  },
+  {
+    name: 'list_drive_files',
+    description: 'Lista los archivos de una carpeta del Drive de Indira con su tamaño. Úsala para ver qué hay en un Drive y decidir qué eliminar.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account: { type: 'string', description: 'Nombre de la cuenta de Drive' },
+        folder_id: { type: 'string', description: 'ID de la carpeta (opcional, default: raíz)' },
+      },
+      required: ['account'],
+    },
+  },
+  {
+    name: 'delete_drive_file',
+    description: 'Mueve un archivo a la papelera de Google Drive (reversible, no elimina permanentemente). Úsala cuando el usuario quiera borrar un archivo específico.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account: { type: 'string', description: 'Nombre de la cuenta' },
+        file_id: { type: 'string', description: 'ID del archivo a eliminar (obtenido de search_drive o list_drive_files)' },
+      },
+      required: ['account', 'file_id'],
+    },
+  },
 ];
 
-export async function processWithClaude(userMessage, memories = [], onToolCall = null) {
+export async function processWithClaude(userMessage, memories = [], onToolCall = null, imageData = null) {
   const memoryContext = memories.length > 0
     ? `\n\nContexto de conversaciones anteriores relevantes:\n${memories.map((m, i) => `${i + 1}. ${m}`).join('\n')}`
     : '';
@@ -238,7 +298,8 @@ export async function processWithClaude(userMessage, memories = [], onToolCall =
 CAPACIDADES REALES:
 - Ver las tareas reales de ClickUp de Indira (se pasan en el mensaje si hay)
 - Crear tareas en ClickUp usando la herramienta create_task
-- Ver y crear eventos en Google Calendar (3 cuentas: clientes, personal, empresa)
+- Ver y crear eventos en Google Calendar (5 cuentas de Google)
+- Ver, analizar y describir imágenes que te envíen por Telegram (visión nativa)
 - Ver agenda y disponibilidad en Cal.com
 - Buscar, crear y editar páginas en Notion
 - Guardar información importante usando save_memory
@@ -255,6 +316,11 @@ CUÁNDO USAR HERRAMIENTAS:
 - get_emails: cuando pregunte por sus correos o emails recibidos
 - read_email: para leer el contenido completo de un email específico
 - send_email: cuando quiera enviar o responder un correo
+- count_emails: SIEMPRE antes de borrar emails en masa — muestra cuántos hay
+- trash_emails_bulk: elimina emails en masa. OBLIGATORIO llamar count_emails primero y confirmar con el usuario
+- list_top_senders: cuando quiera saber qué está llenando su correo
+- list_drive_files: para ver el contenido de un Drive antes de limpiar
+- delete_drive_file: para mover un archivo a la papelera del Drive
 - search_notion: cuando el usuario pregunte algo que puede estar en Notion, o antes de editar
 - update_notion_page: después de search_notion, para editar la página encontrada
 - create_notion_page: cuando el usuario quiera crear algo nuevo en Notion
@@ -268,7 +334,14 @@ REGLAS CRÍTICAS:
 - NO menciones ClickUp si el usuario está hablando de Notion o algo diferente
 - Sé directo y accionable — confirma cuando hagas algo${memoryContext}`;
 
-  const messages = [{ role: 'user', content: userMessage }];
+  const userContent = imageData
+    ? [
+        { type: 'image', source: { type: 'base64', media_type: imageData.mediaType, data: imageData.base64 } },
+        { type: 'text', text: userMessage },
+      ]
+    : userMessage;
+
+  const messages = [{ role: 'user', content: userContent }];
   let totalTokens = 0;
   const MAX_TOOL_CALLS = 10;
   let toolCallCount = 0;
