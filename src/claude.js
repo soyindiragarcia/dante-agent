@@ -299,6 +299,41 @@ export const TOOLS = [
     },
   },
 
+  // ── ClickUp: leer tareas y comentarios de agentes ─────────
+  {
+    name: 'search_tasks',
+    description: 'Busca tareas en ClickUp por nombre o palabra clave. Úsala cuando el usuario pregunte por una tarea específica o quiera saber el estado de algo.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Texto a buscar en los nombres de tareas. Ej: "funnel cliente X", "propuesta Maria"' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'get_task_details',
+    description: 'Lee los detalles completos de una tarea de ClickUp: descripción, estado, asignados y fecha. Úsala cuando el usuario quiera saber qué hay en una tarea concreta.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        task_id: { type: 'string', description: 'ID de la tarea en ClickUp (obtenido de search_tasks o create_task)' },
+      },
+      required: ['task_id'],
+    },
+  },
+  {
+    name: 'get_task_comments',
+    description: 'Lee los comentarios de una tarea de ClickUp. Úsala para ver qué generó Julia (desglose de trabajo o QA) o Martha (propuesta comercial). Muestra el contenido de los comentarios de los agentes.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        task_id: { type: 'string', description: 'ID de la tarea (obtenido de search_tasks o create_task)' },
+      },
+      required: ['task_id'],
+    },
+  },
+
   // ── Recordatorios recurrentes ──────────────────────────────
   {
     name: 'set_recurring_reminder',
@@ -404,7 +439,10 @@ CAPACIDADES REALES:
 - Lista de compras en Notion — cualquier cosa que mencione necesitar comprar
 
 CUÁNDO USAR HERRAMIENTAS:
-- create_task: cuando quiera crear una tarea en ClickUp
+- create_task: cuando quiera crear una tarea en ClickUp. Siempre devuelve el link de la tarea creada.
+- search_tasks: cuando pregunte por una tarea, quiera saber su estado, o necesite encontrar el ID de una tarea para leer sus comentarios
+- get_task_details: para ver descripción y estado de una tarea específica
+- get_task_comments: para leer lo que Julia (desglose/QA) o Martha (propuesta) generaron en una tarea. Úsala cuando pregunten "¿qué dijo Julia?", "¿ya tiene propuesta?", "¿cómo quedó el desglose?"
 - get_all_calendars: USA ESTA SIEMPRE para cualquier pregunta sobre agenda, reuniones, eventos, qué tiene hoy/mañana/esta semana. OBLIGATORIO antes de responder sobre agenda.
 - get_google_calendar: SOLO si menciona una cuenta específica Y ya llamaste get_all_calendars
 - create_google_event: cuando quiera agendar algo
@@ -423,6 +461,12 @@ CUÁNDO USAR HERRAMIENTAS:
 - get_period_prediction: para ver cuándo llega el próximo período, historial de ciclos, y si debe comprar analgésicos
 - add_to_shopping_list: SIEMPRE que mencione necesitar comprar algo — medicamentos, skincare, comida, cualquier producto. Agrégalo a Notion automáticamente sin que ella tenga que pedirlo explícitamente.
 - get_shopping_list: cuando quiera ver qué tiene pendiente por comprar
+
+AGENTES DE CLICKUP (Julia y Martha):
+- Julia genera desgloses de trabajo (Work Breakdown) cuando una tarea pasa a "En progreso", y QA cuando pasa a "En revisión". Sus respuestas aparecen como comentarios en la tarea.
+- Martha genera propuestas comerciales y presupuestos cuando llega una tarea nueva con requerimientos de cliente. Mueve la tarea a "En revisión" al terminar.
+- Cuando Indira pregunte por el resultado de Julia o Martha: usa search_tasks para encontrar la tarea, luego get_task_comments para leer sus comentarios, y preséntale el contenido de forma clara y resumida por Telegram.
+- Cuando crees una tarea con create_task, menciona siempre que Julia se encargará del desglose automáticamente.
 
 HORARIO Y MODO PERSONAL:
 - Indira trabaja Lunes-Viernes de 9am a 5pm (hora Venezuela)

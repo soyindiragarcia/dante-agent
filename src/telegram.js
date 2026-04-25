@@ -4,7 +4,7 @@ import { analyzeImageWithGemini } from './gemini.js';
 import { getOrCreateUser, saveConversation, searchMemories, saveMemory } from './supabase.js';
 import { processWithClaude, generateEmbedding, needsClaudeModel } from './claude.js';
 import { processWithGroq } from './groq-llm.js';
-import { getClickUpTasks, createClickUpTask } from './clickup.js';
+import { getClickUpTasks, createClickUpTask, searchClickUpTasks, getTaskDetails, getTaskComments } from './clickup.js';
 import { getUpcomingBookings, getAvailability } from './calcom.js';
 import { searchNotion, createNotionPage, updateNotionPage, findProjectByName, findResourceByName, queryDatabase, addToShoppingList, getShoppingList } from './notion.js';
 import { getGoogleCalendarEvents, createGoogleCalendarEvent, listGoogleAccounts, getAllCalendarEvents } from './google-calendar.js';
@@ -122,6 +122,21 @@ export async function handleTelegramMessage(message, supabase) {
       if (toolName === 'create_task') {
         const task = await createClickUpTask(toolInput);
         return { success: true, task_id: task.id, task_name: task.name, url: task.url };
+      }
+
+      if (toolName === 'search_tasks') {
+        const tasks = await searchClickUpTasks(toolInput.query);
+        return { tasks, count: tasks.length };
+      }
+
+      if (toolName === 'get_task_details') {
+        const task = await getTaskDetails(toolInput.task_id);
+        return task;
+      }
+
+      if (toolName === 'get_task_comments') {
+        const comments = await getTaskComments(toolInput.task_id);
+        return { comments, count: comments.length };
       }
 
       if (toolName === 'get_calendar_bookings') {
