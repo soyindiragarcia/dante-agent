@@ -369,7 +369,7 @@ export const TOOLS = [
       properties: {
         item: { type: 'string', description: 'Nombre del artículo. Ej: "Ibuprofeno 400mg", "Crema SPF 50", "Proteína de suero"' },
         quantity: { type: 'string', description: 'Cantidad o especificaciones adicionales. Ej: "2 cajas", "250ml", "talla M" (opcional)' },
-        category: { type: 'string', description: 'Categoría: Medicamentos, Skincare, Comida, Hogar, Personal, Otros (opcional)' },
+        category: { type: 'string', description: 'Categoría exacta como aparece en la lista de Notion. Ej: "Medicamentos", "Skincare", "Comida", "Hogar", "Personal". Si no estás seguro, omite para agregar al final.' },
       },
       required: ['item'],
     },

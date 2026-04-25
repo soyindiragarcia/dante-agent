@@ -171,34 +171,86 @@ export async function findResourceByName(name) {
 }
 
 // ============================================================
-// LISTA DE COMPRAS
+// LISTA DE COMPRAS (página Notion con estructura por categorías)
 // ============================================================
+
+// Extrae el texto plano de un bloque de Notion
+function getBlockPlainText(block) {
+  const content = block[block.type];
+  const richText = content?.rich_text || content?.title || [];
+  return richText.map(t => t.plain_text).join('').toLowerCase();
+}
+
+// Agrega un ítem como to-do dentro del bloque de categoría correcto
+async function addItemToShoppingPage(pageId, itemText, category) {
+  let targetId = pageId; // por defecto se agrega al final de la página
+
+  if (category) {
+    try {
+      const blocksRes = await notionClient.get(`/blocks/${pageId}/children`);
+      const blocks = blocksRes.data.results || [];
+
+      // Buscar el bloque (toggle, heading, bullet) que coincida con la categoría
+      for (const block of blocks) {
+        const blockText = getBlockPlainText(block);
+        if (blockText.includes(category.toLowerCase())) {
+          targetId = block.id;
+          break;
+        }
+      }
+    } catch (e) {
+      console.warn('No pude leer los bloques de la lista de compras:', e.message);
+    }
+  }
+
+  const todoBlock = {
+    object: 'block',
+    type: 'to_do',
+    to_do: {
+      rich_text: [{ type: 'text', text: { content: itemText } }],
+      checked: false,
+    },
+  };
+
+  const response = await notionClient.patch(`/blocks/${targetId}/children`, {
+    children: [todoBlock],
+  });
+
+  const newBlock = response.data.results?.[0];
+  const cleanPageId = pageId.replace(/-/g, '');
+  return {
+    id: newBlock?.id,
+    url: `https://www.notion.so/${cleanPageId}`,
+    item: itemText,
+    category: category || 'sin categoría',
+  };
+}
 
 export async function addToShoppingList(item, quantity = null, category = null) {
   try {
+    const itemText = `${item}${quantity ? ` (${quantity})` : ''}`;
+    const pageId = process.env.NOTION_SHOPPING_PAGE_ID;
+
+    if (pageId) {
+      // Página dedicada con estructura de categorías (modo principal)
+      return await addItemToShoppingPage(pageId, itemText, category);
+    }
+
+    // Fallback: base de datos o inbox
     const dbId = process.env.NOTION_SHOPPING_DB_ID || process.env.NOTION_INBOX_DB_ID;
-    const quantityStr = quantity ? ` (${quantity})` : '';
-    const categoryStr = category ? `[${category}] ` : '';
-    const title = `🛒 ${categoryStr}${item}${quantityStr}`;
-
+    const title = `🛒 ${category ? `[${category}] ` : ''}${itemText}`;
     const properties = {
-      Nombre: {
-        title: [{ type: 'text', text: { content: title } }],
-      },
+      Nombre: { title: [{ type: 'text', text: { content: title } }] },
     };
-
-    // Si usa el inbox como fallback, agregar estado Inbox
     if (!process.env.NOTION_SHOPPING_DB_ID) {
       properties.Estatus = { status: { name: 'Inbox' } };
     }
-
     const response = await notionClient.post('/pages', {
       parent: { type: 'database_id', database_id: dbId },
       properties,
     });
-
-    console.log(`🛒 Agregado a lista de compras: ${title}`);
     return { id: response.data.id, url: response.data.url, item: title };
+
   } catch (error) {
     console.error('Notion shopping add error:', error.response?.data || error.message);
     throw new Error(`No pude agregar a la lista de compras: ${JSON.stringify(error.response?.data || error.message)}`);
@@ -207,30 +259,57 @@ export async function addToShoppingList(item, quantity = null, category = null) 
 
 export async function getShoppingList() {
   try {
+    const pageId = process.env.NOTION_SHOPPING_PAGE_ID;
+
+    if (pageId) {
+      // Leer la página de compras: recorrer categorías y sus to-dos pendientes
+      const items = [];
+      const blocksRes = await notionClient.get(`/blocks/${pageId}/children`);
+      const topBlocks = blocksRes.data.results || [];
+
+      for (const block of topBlocks) {
+        const categoryText = block[block.type]?.rich_text?.map(t => t.plain_text).join('') || '';
+        const blockType = block.type;
+
+        // Si es toggle, heading o bullet → puede tener hijos (categorías)
+        if (['toggle', 'heading_1', 'heading_2', 'heading_3', 'bulleted_list_item'].includes(blockType)) {
+          try {
+            const childRes = await notionClient.get(`/blocks/${block.id}/children`);
+            const children = childRes.data.results || [];
+            for (const child of children) {
+              if (child.type === 'to_do' && !child.to_do.checked) {
+                const childText = child.to_do.rich_text.map(t => t.plain_text).join('');
+                items.push({ id: child.id, item: childText, category: categoryText });
+              }
+            }
+          } catch (_) { /* bloque sin hijos */ }
+        }
+
+        // To-do directo en la raíz de la página
+        if (blockType === 'to_do' && !block.to_do.checked) {
+          const text = block.to_do.rich_text.map(t => t.plain_text).join('');
+          items.push({ id: block.id, item: text, category: 'Sin categoría' });
+        }
+      }
+
+      return items;
+    }
+
+    // Fallback: base de datos
     const dbId = process.env.NOTION_SHOPPING_DB_ID || process.env.NOTION_INBOX_DB_ID;
     const response = await notionClient.post(`/databases/${dbId}/query`, { page_size: 100 });
-    const results = (response.data.results || []).filter(item => !item.archived);
-
-    return results
+    return (response.data.results || [])
+      .filter(item => !item.archived)
       .filter(item => {
-        // Si hay DB dedicada de compras, mostrar todo
         if (process.env.NOTION_SHOPPING_DB_ID) return true;
-        // Si usa inbox, solo mostrar ítems con prefijo 🛒
         const titleProp = Object.values(item.properties).find(v => v.type === 'title');
-        const title = titleProp?.title?.[0]?.plain_text || '';
-        return title.startsWith('🛒');
+        return (titleProp?.title?.[0]?.plain_text || '').startsWith('🛒');
       })
       .map(item => {
         const titleProp = Object.values(item.properties).find(v => v.type === 'title');
-        const rawTitle = titleProp?.title?.[0]?.plain_text || 'sin título';
-        const statusProp = Object.values(item.properties).find(v => v.type === 'status');
-        return {
-          id: item.id,
-          item: rawTitle.replace(/^🛒\s*/, ''),
-          status: statusProp?.status?.name || 'Pendiente',
-          url: item.url,
-        };
+        return { id: item.id, item: (titleProp?.title?.[0]?.plain_text || '').replace(/^🛒\s*/, ''), url: item.url };
       });
+
   } catch (error) {
     console.error('Notion get shopping list error:', error.message);
     return [];
