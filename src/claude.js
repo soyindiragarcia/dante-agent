@@ -333,6 +333,19 @@ export const TOOLS = [
       required: ['task_id'],
     },
   },
+  {
+    name: 'mention_agent',
+    description: 'Menciona a Julia o Martha en una tarea de ClickUp con una instrucción. Úsala cuando Indira pida que Julia haga el desglose o el QA de una tarea, o que Martha genere una propuesta.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        task_id: { type: 'string', description: 'ID de la tarea en ClickUp. Si no lo tienes, usa search_tasks primero.' },
+        agent: { type: 'string', enum: ['julia', 'martha'], description: 'julia = desglose de trabajo o QA / martha = propuesta comercial' },
+        instruction: { type: 'string', description: 'Instrucción para el agente. Ej: "por favor haz el desglose de esta tarea", "genera la propuesta para este cliente"' },
+      },
+      required: ['task_id', 'agent', 'instruction'],
+    },
+  },
 
   // ── Recordatorios recurrentes ──────────────────────────────
   {
@@ -462,11 +475,12 @@ CUÁNDO USAR HERRAMIENTAS:
 - add_to_shopping_list: SIEMPRE que mencione necesitar comprar algo — medicamentos, skincare, comida, cualquier producto. Agrégalo a Notion automáticamente sin que ella tenga que pedirlo explícitamente.
 - get_shopping_list: cuando quiera ver qué tiene pendiente por comprar
 
-AGENTES DE CLICKUP (Julia y Martha):
-- Julia genera desgloses de trabajo (Work Breakdown) cuando una tarea pasa a "En progreso", y QA cuando pasa a "En revisión". Sus respuestas aparecen como comentarios en la tarea.
-- Martha genera propuestas comerciales y presupuestos cuando llega una tarea nueva con requerimientos de cliente. Mueve la tarea a "En revisión" al terminar.
-- Cuando Indira pregunte por el resultado de Julia o Martha: usa search_tasks para encontrar la tarea, luego get_task_comments para leer sus comentarios, y preséntale el contenido de forma clara y resumida por Telegram.
-- Cuando crees una tarea con create_task, menciona siempre que Julia se encargará del desglose automáticamente.
+AGENTES DE CLICKUP (Julia y Martha) — se activan SOLO cuando Indira lo pide:
+- Julia = desglose de trabajo (Work Breakdown) y QA. Se le menciona con mention_agent(agent: "julia")
+- Martha = propuestas comerciales y presupuestos. Se le menciona con mention_agent(agent: "martha")
+- Cuando Indira diga "pídele a Julia que desgloses X" o "que Martha haga la propuesta" → usa search_tasks para encontrar la tarea y luego mention_agent para llamarla
+- Para ver qué generaron: search_tasks → get_task_comments → presenta el resumen por Telegram
+- NO actives a Julia ni Martha automáticamente — solo cuando Indira lo solicite explícitamente
 
 HORARIO Y MODO PERSONAL:
 - Indira trabaja Lunes-Viernes de 9am a 5pm (hora Venezuela)

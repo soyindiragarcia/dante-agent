@@ -81,6 +81,35 @@ export async function getTaskComments(taskId) {
   }
 }
 
+// Nombres exactos de los agentes en ClickUp
+const CLICKUP_AGENTS = {
+  julia: 'Julia | Coordinadora de Operaciones',
+  martha: 'Martha | Ejecutiva Comercial y Estratega de Propuesta',
+};
+
+// Publica un comentario en una tarea (para @mencionar agentes)
+export async function postTaskComment(taskId, commentText) {
+  try {
+    const response = await clickupClient.post(`/task/${taskId}/comment`, {
+      comment_text: commentText,
+      notify_all: false,
+    });
+    console.log(`💬 Comentario publicado en tarea ${taskId}`);
+    return { success: true, comment_id: response.data.id };
+  } catch (error) {
+    console.error('ClickUp comment error:', error.response?.data || error.message);
+    throw new Error(`No pude publicar el comentario: ${error.response?.data?.err || error.message}`);
+  }
+}
+
+// @menciona a Julia o Martha en una tarea con una instrucción específica
+export async function mentionAgent(taskId, agent, instruction) {
+  const agentName = CLICKUP_AGENTS[agent.toLowerCase()];
+  if (!agentName) throw new Error(`Agente desconocido: ${agent}. Usa "julia" o "martha".`);
+  const commentText = `@${agentName} ${instruction}`;
+  return await postTaskComment(taskId, commentText);
+}
+
 export async function createClickUpTask({ name, description = '', due_date = null }) {
   try {
     const listId = process.env.CLICKUP_LIST_ID;
