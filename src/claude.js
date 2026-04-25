@@ -366,7 +366,7 @@ export async function processWithClaude(userMessage, memories = [], onToolCall =
     { type: 'text', text: dynamicSystem },
   ];
 
-  const MODEL = process.env.CLAUDE_MODEL || 'claude-3-5-haiku-20241022';
+  const MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-4-5';
 
   try {
     let response = await client.messages.create({
