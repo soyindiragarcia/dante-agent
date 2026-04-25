@@ -246,8 +246,8 @@ CAPACIDADES REALES:
 
 CUÁNDO USAR HERRAMIENTAS:
 - create_task: cuando el usuario quiera crear una tarea en ClickUp
-- get_all_calendars: SIEMPRE que pregunte por su agenda, reuniones, qué tiene esta semana/hoy sin especificar cuenta. Revisa TODOS los calendarios de una vez.
-- get_google_calendar: solo cuando mencione una cuenta específica (ej: "el calendario de propuestas").
+- get_all_calendars: USA ESTA SIEMPRE que haya cualquier pregunta sobre calendario, agenda, reuniones, eventos, qué tiene hoy/mañana/esta semana/el martes. NUNCA asumas que no hay eventos sin haber llamado esta herramienta primero. Es OBLIGATORIO llamarla antes de responder cualquier cosa sobre agenda.
+- get_google_calendar: SOLO si la usuaria menciona explícitamente una cuenta específica Y ya llamaste get_all_calendars.
 - create_google_event: cuando quiera agendar algo en Google Calendar
 - search_drive: cuando pregunte por archivos, documentos, presentaciones en su Drive
 - read_drive_file: después de search_drive, para leer el contenido de un archivo específico
