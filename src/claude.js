@@ -288,12 +288,8 @@ const TOOLS = [
   },
 ];
 
-export async function processWithClaude(userMessage, memories = [], onToolCall = null, imageData = null) {
-  const memoryContext = memories.length > 0
-    ? `\n\nContexto de conversaciones anteriores relevantes:\n${memories.map((m, i) => `${i + 1}. ${m}`).join('\n')}`
-    : '';
-
-  const systemPrompt = `Eres DANTE, asistente de IA personal de Indira García. Hoy es ${new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.
+// Parte estática del system prompt — se cachea entre requests
+const STATIC_SYSTEM = `Eres DANTE, asistente de IA personal de Indira García.
 
 CAPACIDADES REALES:
 - Ver las tareas reales de ClickUp de Indira (se pasan en el mensaje si hay)
@@ -304,6 +300,8 @@ CAPACIDADES REALES:
 - Buscar, crear y editar páginas en Notion
 - Guardar información importante usando save_memory
 - Recordar contexto de conversaciones anteriores
+- Leer y enviar emails de Gmail, limpiar correos en masa
+- Buscar, leer, crear y eliminar archivos en Google Drive
 
 CUÁNDO USAR HERRAMIENTAS:
 - create_task: cuando el usuario quiera crear una tarea en ClickUp
@@ -313,14 +311,14 @@ CUÁNDO USAR HERRAMIENTAS:
 - search_drive: cuando pregunte por archivos, documentos, presentaciones en su Drive
 - read_drive_file: después de search_drive, para leer el contenido de un archivo específico
 - create_drive_doc: cuando quiera crear un documento en Drive
+- list_drive_files: para ver el contenido de un Drive antes de limpiar
+- delete_drive_file: para mover un archivo a la papelera del Drive
 - get_emails: cuando pregunte por sus correos o emails recibidos
 - read_email: para leer el contenido completo de un email específico
 - send_email: cuando quiera enviar o responder un correo
 - count_emails: SIEMPRE antes de borrar emails en masa — muestra cuántos hay
 - trash_emails_bulk: elimina emails en masa. OBLIGATORIO llamar count_emails primero y confirmar con el usuario
 - list_top_senders: cuando quiera saber qué está llenando su correo
-- list_drive_files: para ver el contenido de un Drive antes de limpiar
-- delete_drive_file: para mover un archivo a la papelera del Drive
 - search_notion: cuando el usuario pregunte algo que puede estar en Notion, o antes de editar
 - update_notion_page: después de search_notion, para editar la página encontrada
 - create_notion_page: cuando el usuario quiera crear algo nuevo en Notion
@@ -332,7 +330,22 @@ REGLAS CRÍTICAS:
 - NUNCA inventes datos — usa solo lo que se te proporciona
 - Si el usuario pide editar algo en Notion: PRIMERO busca con search_notion, LUEGO edita con update_notion_page
 - NO menciones ClickUp si el usuario está hablando de Notion o algo diferente
-- Sé directo y accionable — confirma cuando hagas algo${memoryContext}`;
+- Sé directo y accionable — confirma cuando hagas algo
+- Para limpiar emails: SIEMPRE usa count_emails primero, muestra el número y pide confirmación antes de borrar`;
+
+// Tools con cache en el último elemento
+const TOOLS_CACHED = TOOLS.map((tool, i) =>
+  i === TOOLS.length - 1 ? { ...tool, cache_control: { type: 'ephemeral' } } : tool
+);
+
+export async function processWithClaude(userMessage, memories = [], onToolCall = null, imageData = null) {
+  const today = new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const memoryContext = memories.length > 0
+    ? `\nContexto de conversaciones anteriores relevantes:\n${memories.map((m, i) => `${i + 1}. ${m}`).join('\n')}`
+    : '';
+
+  // Parte dinámica (fecha + memorias) — no se cachea porque cambia
+  const dynamicSystem = `Hoy es ${today}.${memoryContext}`;
 
   const userContent = imageData
     ? [
@@ -343,18 +356,28 @@ REGLAS CRÍTICAS:
 
   const messages = [{ role: 'user', content: userContent }];
   let totalTokens = 0;
+  let cacheHits = 0;
   const MAX_TOOL_CALLS = 10;
   let toolCallCount = 0;
 
+  // System como array: parte estática cacheada + parte dinámica sin cache
+  const systemBlocks = [
+    { type: 'text', text: STATIC_SYSTEM, cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: dynamicSystem },
+  ];
+
+  const MODEL = process.env.CLAUDE_MODEL || 'claude-3-5-haiku-20241022';
+
   try {
     let response = await client.messages.create({
-      model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-5',
+      model: MODEL,
       max_tokens: 2048,
-      system: systemPrompt,
-      tools: TOOLS,
+      system: systemBlocks,
+      tools: TOOLS_CACHED,
       messages,
     });
     totalTokens += response.usage.input_tokens + response.usage.output_tokens;
+    cacheHits += response.usage.cache_read_input_tokens || 0;
 
     // Loop agentivo: permite múltiples tool calls en secuencia
     while (response.stop_reason === 'tool_use' && toolCallCount < MAX_TOOL_CALLS) {
@@ -387,19 +410,22 @@ REGLAS CRÍTICAS:
 
       // Llamar a Claude de nuevo con los resultados
       response = await client.messages.create({
-        model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-5',
+        model: MODEL,
         max_tokens: 1024,
-        system: systemPrompt,
-        tools: TOOLS,
+        system: systemBlocks,
+        tools: TOOLS_CACHED,
         messages,
       });
       totalTokens += response.usage.input_tokens + response.usage.output_tokens;
+      cacheHits += response.usage.cache_read_input_tokens || 0;
     }
 
     const text = response.content.find(b => b.type === 'text');
+    if (cacheHits > 0) console.log(`💰 Cache hits: ${cacheHits} tokens ahorrados`);
     return {
       content: text?.text || '✅ Hecho.',
       tokens: totalTokens,
+      cacheHits,
     };
 
   } catch (error) {
