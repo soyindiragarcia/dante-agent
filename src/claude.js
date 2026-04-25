@@ -467,9 +467,9 @@ CUÁNDO USAR HERRAMIENTAS:
 - search_notion / update_notion_page / create_notion_page / query_notion_database: para contenido en Notion
 - save_memory: cuando diga "recuerda que..." o comparta info personal importante
 - set_reminder: recordatorio puntual — "recuérdame el martes a las 3pm". Hora en Venezuela. Confirma al responder.
-- set_recurring_reminder: recordatorio que se repite — medicamentos diarios, rutina de skincare, vitaminas. Confirma hora y frecuencia.
-- list_recurring_reminders: cuando pregunte qué recordatorios tiene activos
-- delete_recurring_reminder: para desactivar un recordatorio recurrente (obtén el ID con list primero)
+- set_recurring_reminder: recordatorio que se repite — medicamentos diarios, rutina de skincare, vitaminas, oración, hábitos. Confirma hora y frecuencia. REGLA CRÍTICA: si menciona VARIOS horarios o hábitos en un mismo mensaje, crea UN recordatorio por cada uno — no omitas ninguno. Ej: "recuérdame el skincare a las 8:30 y orar a las 10pm" → dos llamadas a set_recurring_reminder.
+- list_recurring_reminders: cuando pregunte qué recordatorios tiene activos. Úsalo también para confirmar los que acabas de crear.
+- delete_recurring_reminder: para desactivar un recordatorio recurrente (obtén el ID con list primero). Para CAMBIAR la hora de uno existente: primero delete, luego set_recurring_reminder con la nueva hora.
 - log_period: cuando diga "me llegó el período", "empezó mi período", "se me fue", "terminó". Si no da fecha usa hoy. DESPUÉS llama get_period_prediction para mostrar la predicción.
 - get_period_prediction: para ver cuándo llega el próximo período, historial de ciclos, y si debe comprar analgésicos
 - add_to_shopping_list: SIEMPRE que mencione necesitar comprar algo — medicamentos, skincare, comida, cualquier producto. Agrégalo a Notion automáticamente sin que ella tenga que pedirlo explícitamente.
@@ -498,6 +498,7 @@ REGLAS CRÍTICAS:
 - Para compras: si menciona que necesita algo → llama add_to_shopping_list INMEDIATAMENTE, sin esperar a que lo pida
 - Para período: después de log_period → llama get_period_prediction. Si days_until_next ≤ 7, sugiere add_to_shopping_list para analgésicos (Ibuprofeno 400mg o Naproxeno)
 - Para medicamentos diarios: usa set_recurring_reminder con frequency: 'daily'
+- Para recordatorios: cuando describa su rutina o mencione varios horarios, extrae CADA UNO y crea un recordatorio por separado. Al terminar, muestra la lista completa de lo que quedó configurado.
 - Sé directo y accionable — confirma siempre lo que hiciste`;
 
 // Tools con cache en el último elemento
