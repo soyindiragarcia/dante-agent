@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { transcribeVoiceMessage } from './voice.js';
 import { analyzeImageWithGemini } from './gemini.js';
-import { getOrCreateUser, saveConversation, searchMemories, saveMemory } from './supabase.js';
+import { getOrCreateUser, saveConversation, searchMemories, saveMemory, getRecentConversations } from './supabase.js';
 import { processWithClaude, generateEmbedding, needsClaudeModel } from './claude.js';
 import { processWithGroq } from './groq-llm.js';
 import { getClickUpTasks, createClickUpTask, searchClickUpTasks, getTaskDetails, getTaskComments, mentionAgent } from './clickup.js';
@@ -95,9 +95,15 @@ export async function handleTelegramMessage(message, supabase) {
     const user = await getOrCreateUser(supabase, from.id, from.first_name, from.username);
 
     const userEmbedding = generateEmbedding(messageText);
-    await saveConversation(supabase, user.id, 'user', messageText, userEmbedding);
 
-    const memories = await searchMemories(supabase, user.id, messageText, userEmbedding, 3);
+    // Buscar memorias e historial ANTES de guardar el mensaje actual
+    // (para no duplicarlo en el contexto)
+    const [memories, recentHistory] = await Promise.all([
+      searchMemories(supabase, user.id, messageText, userEmbedding, 3),
+      getRecentConversations(supabase, user.id, 10),
+    ]);
+
+    await saveConversation(supabase, user.id, 'user', messageText, userEmbedding);
 
     const workTime = isWorkHours();
     const [clickupTasks, googleAccounts] = await Promise.all([
@@ -342,14 +348,14 @@ export async function handleTelegramMessage(message, supabase) {
 
     if (claudeNeeded) {
       console.log(`🧠 Usando Claude (${claudeNeeded})`);
-      response = await processWithClaude(fullMessage, memories, handleToolCall, imageData);
+      response = await processWithClaude(fullMessage, memories, handleToolCall, imageData, recentHistory);
     } else {
       console.log('⚡ Usando Groq LLaMA (gratis)');
       try {
-        response = await processWithGroq(fullMessage, memories, handleToolCall);
+        response = await processWithGroq(fullMessage, memories, handleToolCall, recentHistory);
       } catch (groqError) {
         console.error('Groq falló, fallback a Claude Haiku:', groqError.message);
-        response = await processWithClaude(fullMessage, memories, handleToolCall, imageData);
+        response = await processWithClaude(fullMessage, memories, handleToolCall, imageData, recentHistory);
       }
     }
 

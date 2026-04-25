@@ -17,7 +17,7 @@ function toOpenAITools(claudeTools) {
   }));
 }
 
-export async function processWithGroq(userMessage, memories = [], onToolCall = null) {
+export async function processWithGroq(userMessage, memories = [], onToolCall = null, conversationHistory = []) {
   const today = new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const memoryContext = memories.length > 0
     ? `\nContexto de conversaciones anteriores relevantes:\n${memories.map((m, i) => `${i + 1}. ${m}`).join('\n')}`
@@ -25,8 +25,10 @@ export async function processWithGroq(userMessage, memories = [], onToolCall = n
 
   const systemPrompt = `${STATIC_SYSTEM}\n\nHoy es ${today}.${memoryContext}`;
 
+  // Historial reciente + mensaje actual
   const messages = [
     { role: 'system', content: systemPrompt },
+    ...conversationHistory,
     { role: 'user', content: userMessage },
   ];
 

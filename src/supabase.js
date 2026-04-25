@@ -54,6 +54,33 @@ export async function saveMemory(supabase, userId, key, value) {
   return { key, value };
 }
 
+// Trae los últimos N mensajes reales de la conversación (para dar contexto al LLM)
+export async function getRecentConversations(supabase, userId, limit = 8) {
+  try {
+    const { data, error } = await supabase
+      .from('conversations')
+      .select('message_role, content')
+      .eq('user_id', userId)
+      .in('message_role', ['user', 'assistant'])
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.warn('Recent conversations error:', error.message);
+      return [];
+    }
+
+    // Invertir para orden cronológico y mapear al formato {role, content}
+    return (data || []).reverse().map(row => ({
+      role: row.message_role,
+      content: row.content,
+    }));
+  } catch (e) {
+    console.error('getRecentConversations error:', e.message);
+    return [];
+  }
+}
+
 export async function searchMemories(supabase, userId, query, embedding, limit = 3) {
   if (!embedding) return [];
 

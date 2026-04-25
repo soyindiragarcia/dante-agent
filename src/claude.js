@@ -533,7 +533,7 @@ function selectModel(message, hasImage = null) {
   return 'claude-haiku-4-5'; // fallback si llega aquí
 }
 
-export async function processWithClaude(userMessage, memories = [], onToolCall = null, imageData = null) {
+export async function processWithClaude(userMessage, memories = [], onToolCall = null, imageData = null, conversationHistory = []) {
   const today = new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const memoryContext = memories.length > 0
     ? `\nContexto de conversaciones anteriores relevantes:\n${memories.map((m, i) => `${i + 1}. ${m}`).join('\n')}`
@@ -549,7 +549,11 @@ export async function processWithClaude(userMessage, memories = [], onToolCall =
       ]
     : userMessage;
 
-  const messages = [{ role: 'user', content: userContent }];
+  // Historial reciente como contexto de conversación + mensaje actual
+  const messages = [
+    ...conversationHistory,
+    { role: 'user', content: userContent },
+  ];
   let totalTokens = 0;
   let cacheHits = 0;
   const MAX_TOOL_CALLS = 10;
