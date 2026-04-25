@@ -275,6 +275,18 @@ export const TOOLS = [
     },
   },
   {
+    name: 'set_reminder',
+    description: 'Crea un recordatorio para enviarle un mensaje a Indira en una fecha y hora específica por Telegram. Úsala cuando diga "recuérdame", "avísame", "mándame un mensaje a las X". La hora es en Venezuela (UTC-4).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', description: 'El mensaje del recordatorio. Sé descriptivo y útil. Ej: "Llamar a Juan para hablar del presupuesto"' },
+        datetime: { type: 'string', description: 'Fecha y hora en Venezuela en formato ISO sin zona horaria. Ej: 2026-04-25T15:00:00' },
+      },
+      required: ['message', 'datetime'],
+    },
+  },
+  {
     name: 'delete_drive_file',
     description: 'Mueve un archivo a la papelera de Google Drive (reversible, no elimina permanentemente). Úsala cuando el usuario quiera borrar un archivo específico.',
     input_schema: {
@@ -323,6 +335,7 @@ CUÁNDO USAR HERRAMIENTAS:
 - update_notion_page: después de search_notion, para editar la página encontrada
 - create_notion_page: cuando el usuario quiera crear algo nuevo en Notion
 - save_memory: cuando el usuario diga "recuerda que..." o comparta info personal importante
+- set_reminder: cuando diga "recuérdame", "avísame a las X", "mándame un mensaje mañana a las Y". La hora siempre es en Venezuela (UTC-4). Confirma la hora exacta al usuario.
 
 REGLAS CRÍTICAS:
 - Responde SIEMPRE en español natural y conversacional

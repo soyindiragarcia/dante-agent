@@ -1,8 +1,10 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import cron from 'node-cron';
 import { handleTelegramMessage } from './src/telegram.js';
 import { initSupabase } from './src/supabase.js';
 import { getAuthUrl, handleGoogleCallback, saveGoogleAccount, listGoogleAccounts } from './src/google-calendar.js';
+import { checkAndSendReminders } from './src/reminders.js';
 
 dotenv.config();
 
@@ -111,6 +113,16 @@ app.post(`/webhook/telegram`, async (req, res) => {
   }
 });
 
+// Cron job: revisa recordatorios cada minuto
+cron.schedule('* * * * *', async () => {
+  try {
+    await checkAndSendReminders();
+  } catch (err) {
+    console.error('Reminders cron error:', err.message);
+  }
+});
+
 app.listen(port, () => {
   console.log(`🧠 DANTE running on port ${port}`);
+  console.log(`⏰ Recordatorios activos (revisión cada minuto)`);
 });

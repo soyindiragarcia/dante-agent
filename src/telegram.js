@@ -8,6 +8,7 @@ import { getClickUpTasks, createClickUpTask } from './clickup.js';
 import { getUpcomingBookings, getAvailability } from './calcom.js';
 import { searchNotion, createNotionPage, updateNotionPage, findProjectByName, findResourceByName, queryDatabase } from './notion.js';
 import { getGoogleCalendarEvents, createGoogleCalendarEvent, listGoogleAccounts, getAllCalendarEvents } from './google-calendar.js';
+import { saveReminder } from './reminders.js';
 import { searchDrive, readDriveFile, createDriveDoc, deleteDriveFile, listDriveFiles } from './google-drive.js';
 import { getEmails, readEmail, sendEmail, countEmails, trashEmailsBulk, listTopSenders } from './gmail.js';
 
@@ -227,6 +228,11 @@ export async function handleTelegramMessage(message, supabase) {
       if (toolName === 'delete_drive_file') {
         const result = await deleteDriveFile(toolInput.account, toolInput.file_id);
         return result;
+      }
+
+      if (toolName === 'set_reminder') {
+        const reminder = await saveReminder(chat.id, toolInput.message, toolInput.datetime);
+        return { success: true, message: toolInput.message, scheduled_at: toolInput.datetime };
       }
 
       return { error: `Herramienta desconocida: ${toolName}` };
