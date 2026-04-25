@@ -2,7 +2,8 @@ import axios from 'axios';
 import { transcribeVoiceMessage } from './voice.js';
 import { analyzeImageWithGemini } from './gemini.js';
 import { getOrCreateUser, saveConversation, searchMemories, saveMemory } from './supabase.js';
-import { processWithClaude, generateEmbedding } from './claude.js';
+import { processWithClaude, generateEmbedding, needsClaudeModel } from './claude.js';
+import { processWithGroq } from './groq-llm.js';
 import { getClickUpTasks, createClickUpTask } from './clickup.js';
 import { getUpcomingBookings, getAvailability } from './calcom.js';
 import { searchNotion, createNotionPage, updateNotionPage, findProjectByName, findResourceByName, queryDatabase } from './notion.js';
@@ -231,7 +232,22 @@ export async function handleTelegramMessage(message, supabase) {
       return { error: `Herramienta desconocida: ${toolName}` };
     };
 
-    const response = await processWithClaude(fullMessage, memories, handleToolCall, imageData);
+    // Routing: Groq (gratis) para tareas estándar, Claude solo si hace falta
+    const claudeNeeded = needsClaudeModel(fullMessage, imageData);
+    let response;
+
+    if (claudeNeeded) {
+      console.log(`🧠 Usando Claude (${claudeNeeded})`);
+      response = await processWithClaude(fullMessage, memories, handleToolCall, imageData);
+    } else {
+      console.log('⚡ Usando Groq LLaMA (gratis)');
+      try {
+        response = await processWithGroq(fullMessage, memories, handleToolCall);
+      } catch (groqError) {
+        console.error('Groq falló, fallback a Claude Haiku:', groqError.message);
+        response = await processWithClaude(fullMessage, memories, handleToolCall, imageData);
+      }
+    }
 
     const responseEmbedding = generateEmbedding(response.content);
     await saveConversation(supabase, user.id, 'assistant', response.content, responseEmbedding);

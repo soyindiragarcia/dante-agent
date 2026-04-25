@@ -4,7 +4,7 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-const TOOLS = [
+export const TOOLS = [
   {
     name: 'create_task',
     description: 'Crea una tarea en ClickUp en el inbox de DANTE. Úsala cuando el usuario quiera crear una tarea, recordatorio, o acción pendiente. Genera un nombre claro y una descripción detallada con todo el contexto necesario.',
@@ -288,8 +288,8 @@ const TOOLS = [
   },
 ];
 
-// Parte estática del system prompt — se cachea entre requests
-const STATIC_SYSTEM = `Eres DANTE, asistente de IA personal de Indira García.
+// Parte estática del system prompt — se cachea entre requests (también exportado para Groq)
+export const STATIC_SYSTEM = `Eres DANTE, asistente de IA personal de Indira García.
 
 CAPACIDADES REALES:
 - Ver las tareas reales de ClickUp de Indira (se pasan en el mensaje si hay)
@@ -346,20 +346,24 @@ const WRITING_KEYWORDS = [
   'presentación', 'resumen ejecutivo', 'reporte',
 ];
 
-function selectModel(message, hasImage = null) {
-  // Si la imagen llegó a Claude (fallback de Gemini) → Sonnet para mejor visión
-  if (hasImage) return 'claude-sonnet-4-5';
+export function needsClaudeModel(message, hasImage = null) {
+  // Si la imagen llegó a Claude (fallback de Gemini) → necesita Claude Vision
+  if (hasImage) return 'sonnet';
 
   const lower = (message || '').toLowerCase();
   const needsWriting = WRITING_KEYWORDS.some(kw => lower.includes(kw));
 
-  if (needsWriting) {
-    console.log('✍️ Tarea de escritura compleja → claude-sonnet-4-5');
+  if (needsWriting) return 'sonnet'; // Escritura compleja → Claude Sonnet
+  return null; // Todo lo demás → Groq (gratis)
+}
+
+function selectModel(message, hasImage = null) {
+  const claudeNeeded = needsClaudeModel(message, hasImage);
+  if (claudeNeeded === 'sonnet') {
+    console.log('✍️ Escritura compleja → claude-sonnet-4-5');
     return 'claude-sonnet-4-5';
   }
-
-  console.log('⚡ Tarea estándar → claude-haiku-4-5');
-  return process.env.CLAUDE_MODEL || 'claude-haiku-4-5';
+  return 'claude-haiku-4-5'; // fallback si llega aquí
 }
 
 export async function processWithClaude(userMessage, memories = [], onToolCall = null, imageData = null) {
